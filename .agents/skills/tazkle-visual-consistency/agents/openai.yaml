@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tazkle Visual Consistency"
+  short_description: "Mantiene coherencia visual en Tazkle"
+  default_prompt: "Use $tazkle-visual-consistency to review this Tazkle interface for visual consistency."

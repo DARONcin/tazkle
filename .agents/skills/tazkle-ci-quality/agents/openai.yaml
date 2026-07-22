@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tazkle CI & Quality"
+  short_description: "Aplica puertas de calidad y CI en Tazkle"
+  default_prompt: "Use $tazkle-ci-quality to define and run the quality gates for this Tazkle change."

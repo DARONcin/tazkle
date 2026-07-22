@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tazkle UX & Accessibility"
+  short_description: "Valida UX y accesibilidad de Tazkle"
+  default_prompt: "Use $tazkle-ux-accessibility to review this Tazkle flow for usability and accessibility."

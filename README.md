@@ -40,6 +40,19 @@ Un monorepo no implica un monolito: cada servicio tendrá límites, contratos y 
 - [Atajos de teclado](docs/ux/keyboard-shortcuts.md)
 - [Índice visual](design/index.md)
 
+## Skills de proyecto
+
+- `tazkle-visual-consistency`: coherencia visual, temas, densidad, marca y movimiento.
+- `tazkle-ux-accessibility`: flujos, teclado, VoiceOver, estados y alternativas al arrastre.
+- `tazkle-security-audit`: amenazas, autorización, inyecciones, APIs, IA y auditoría.
+- `tazkle-ci-quality`: puertas de calidad, evidencia, CI y preparación de releases.
+
+Las skills viven en `.agents/skills` y forman parte de las reglas versionadas del proyecto. Su puerta local conjunta es:
+
+```bash
+.agents/skills/tazkle-ci-quality/scripts/run-quality-gates.sh
+```
+
 ## Estructura futura
 
 ```text

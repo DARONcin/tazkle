@@ -3,6 +3,7 @@
 
 # Sensitive areas require explicit review.
 /docs/security/ @DARONcin
+/.agents/ @DARONcin
 /packages/security/ @DARONcin
 /services/gateway/ @DARONcin
 /services/project-core/ @DARONcin
