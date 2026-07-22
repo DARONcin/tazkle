@@ -1,0 +1,15 @@
+* text=auto eol=lf
+
+*.md text diff=markdown
+*.swift text
+*.ts text
+*.tsx text
+*.json text
+*.yml text
+*.yaml text
+*.svg text
+
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.pdf binary

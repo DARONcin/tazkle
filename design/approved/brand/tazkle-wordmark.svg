@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#081018"/>
+      <stop offset="1" stop-color="#0C1721"/>
+    </linearGradient>
+    <style>
+      .ui { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif; }
+      .label { fill:#7F91A0; font-size:18px; letter-spacing:1.4px; }
+      .body { fill:#BAC6CE; font-size:20px; }
+    </style>
+
+    <!-- Wordmark geométrico. La T es deliberadamente ortodoxa: barra + asta recta. -->
+    <g id="wordmark" fill="currentColor">
+      <!-- T -->
+      <path d="M0 0H132V24H79V150H53V24H0Z"/>
+      <!-- A -->
+      <path fill-rule="evenodd" d="M157 150L215 0H247L305 150H277L264 114H198L185 150H157ZM207 90H255L231 25Z"/>
+      <!-- Z -->
+      <path d="M330 0H464V24L371 126H464V150H330V126L423 24H330Z"/>
+      <!-- K -->
+      <path d="M494 0H520V64L582 0H617L550 70L621 150H585L520 78V150H494Z"/>
+      <!-- L -->
+      <path d="M650 0H676V126H759V150H650Z"/>
+      <!-- E -->
+      <path d="M790 0H916V24H816V62H902V86H816V126H916V150H790Z"/>
+    </g>
+
+    <g id="symbol">
+      <path d="M0 36L36 0H120V62L92 90L120 118V180H36L0 144Z" fill="#A071FF"/>
+      <path d="M212 36L176 0H132V62L160 90L132 118V180H176L212 144Z" fill="#7DC9FF"/>
+    </g>
+  </defs>
+
+  <rect width="1536" height="1024" fill="url(#bg)"/>
+  <rect x="28" y="28" width="1480" height="968" rx="20" fill="none" stroke="#223440"/>
+
+  <text x="64" y="86" class="ui" fill="#F2F5F7" font-size="32" font-weight="650">Dirección C.2 — Wordmark vectorial exacto</text>
+  <text x="64" y="123" class="ui body">Legibilidad primero; personalidad en Z y K.</text>
+  <line x1="64" y1="154" x2="1472" y2="154" stroke="#263A47"/>
+
+  <text x="64" y="210" class="ui label">WORDMARK PRINCIPAL</text>
+  <g transform="translate(64 254) scale(1.27)" color="#F2F5F7"><use href="#wordmark"/></g>
+
+  <line x1="64" y1="486" x2="1472" y2="486" stroke="#263A47"/>
+
+  <text x="64" y="540" class="ui label">CONSTRUCCIÓN DE LA T</text>
+  <g transform="translate(80 585) scale(1.55)" color="#F2F5F7">
+    <path d="M0 0H132V24H79V150H53V24H0Z" fill="currentColor"/>
+  </g>
+  <line x1="80" y1="574" x2="285" y2="574" stroke="#7DC9FF" stroke-dasharray="5 5"/>
+  <line x1="162" y1="572" x2="162" y2="830" stroke="#7DC9FF" stroke-dasharray="5 5"/>
+  <text x="335" y="628" class="ui" fill="#F2F5F7" font-size="28" font-weight="650">T, sin ambigüedad</text>
+  <text x="335" y="675" class="ui body">Barra superior recta y amplia.</text>
+  <text x="335" y="708" class="ui body">Asta vertical centrada.</text>
+  <text x="335" y="741" class="ui body">Sin diagonales, muescas ni metáforas.</text>
+
+  <line x1="620" y1="526" x2="620" y2="938" stroke="#263A47"/>
+  <text x="670" y="540" class="ui label">LOCKUP Y PRUEBAS DE ESCALA</text>
+
+  <g transform="translate(670 594) scale(.55)">
+    <use href="#symbol"/>
+    <g transform="translate(270 15)" color="#F2F5F7"><use href="#wordmark"/></g>
+  </g>
+  <text x="670" y="734" class="ui body">Principal</text>
+
+  <g transform="translate(670 775) scale(.22)">
+    <use href="#symbol"/>
+    <g transform="translate(270 15)" color="#F2F5F7"><use href="#wordmark"/></g>
+  </g>
+  <text x="925" y="816" class="ui body">32 px</text>
+
+  <g transform="translate(670 861) scale(.14)">
+    <use href="#symbol"/>
+    <g transform="translate(270 15)" color="#F2F5F7"><use href="#wordmark"/></g>
+  </g>
+  <text x="835" y="890" class="ui body">Sidebar</text>
+
+  <rect x="1168" y="548" width="270" height="270" rx="58" fill="#111D27" stroke="#354754" stroke-width="3"/>
+  <g transform="translate(1197 593)"><use href="#symbol"/></g>
+  <text x="1168" y="864" class="ui label">ICONO macOS</text>
+  <circle cx="1190" cy="916" r="15" fill="#A071FF"/>
+  <circle cx="1240" cy="916" r="15" fill="#7DC9FF"/>
+  <circle cx="1290" cy="916" r="15" fill="#F0B84B"/>
+  <circle cx="1340" cy="916" r="15" fill="#75C46A"/>
+</svg>

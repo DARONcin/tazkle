@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024">
+  <defs>
+    <style>
+      .ui{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif}
+      .label{fill:#8193A0;font-size:17px;letter-spacing:1.5px}
+      .body{fill:#B9C6CD;font-size:20px}
+    </style>
+
+    <!-- Límite de construcción: existe como recorte, nunca se dibuja. -->
+    <clipPath id="invisible-circle"><circle cx="0" cy="0" r="72"/></clipPath>
+
+    <!-- Curva maestra compacta; su opuesta usa la misma geometría rotada. -->
+    <path id="balanced-branch" d="M0 0H26A26 26 0 0 0 52-26"/>
+
+    <g id="balanced-t-color" clip-path="url(#invisible-circle)" fill="none" stroke="#EFF3F6" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M0 0V-58"/>
+      <use href="#balanced-branch"/>
+      <use href="#balanced-branch" transform="rotate(180)"/>
+      <!-- El gancho inferior se recoge dentro del mismo radio visual. -->
+      <path d="M0 0V30C0 58 52 58 52 30V26"/>
+      <g stroke="#EFF3F6" stroke-width="3">
+        <circle cx="0" cy="-58" r="10" fill="#4F7CFF"/>
+        <circle cx="52" cy="-26" r="10" fill="#6DD6E7"/>
+        <circle cx="-52" cy="26" r="10" fill="#8C6BFF"/>
+        <circle cx="52" cy="26" r="10" fill="#F1B84B"/>
+      </g>
+    </g>
+
+    <g id="balanced-t-mono" clip-path="url(#invisible-circle)" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M0 0V-58"/>
+      <use href="#balanced-branch"/>
+      <use href="#balanced-branch" transform="rotate(180)"/>
+      <path d="M0 0V30C0 58 52 58 52 30V26"/>
+      <g fill="currentColor" stroke="none">
+        <circle cx="0" cy="-58" r="10"/>
+        <circle cx="52" cy="-26" r="10"/>
+        <circle cx="-52" cy="26" r="10"/>
+        <circle cx="52" cy="26" r="10"/>
+      </g>
+    </g>
+
+    <g id="wordmark" fill="currentColor">
+      <path d="M0 0H132V24H79V150H53V24H0Z"/>
+      <path fill-rule="evenodd" d="M157 150L215 0H247L305 150H277L264 114H198L185 150H157ZM207 90H255L231 25Z"/>
+      <path d="M330 0H464V24L371 126H464V150H330V126L423 24H330Z"/>
+      <path d="M494 0H520V64L582 0H617L550 70L621 150H585L520 78V150H494Z"/>
+      <path d="M650 0H676V126H759V150H650Z"/>
+      <path d="M790 0H916V24H816V62H902V86H816V126H916V150H790Z"/>
+    </g>
+  </defs>
+
+  <rect width="1536" height="1024" fill="#08131D"/>
+  <rect x="24" y="24" width="1488" height="976" rx="22" fill="none" stroke="#233744"/>
+  <text x="62" y="80" class="ui" fill="#F2F5F7" font-size="31" font-weight="650">Propuesta G.1 — Circular Balance</text>
+  <text x="62" y="118" class="ui body">Todo el peso vive dentro de una circunferencia invisible.</text>
+  <line x1="62" y1="150" x2="1474" y2="150" stroke="#263B48"/>
+
+  <text x="62" y="206" class="ui label">ISOTIPO PRINCIPAL</text>
+  <g transform="translate(320 470) scale(3.55)"><use href="#balanced-t-color"/></g>
+
+  <text x="62" y="772" class="ui" fill="#F2F5F7" font-size="25" font-weight="620">Contención sin contorno</text>
+  <text x="62" y="811" class="ui body">El círculo organiza; nunca aparece.</text>
+  <text x="62" y="846" class="ui body">Los cuatro nodos conservan un margen exterior uniforme.</text>
+  <text x="62" y="881" class="ui body">El gancho amarillo ya no arrastra el peso hacia abajo.</text>
+
+  <line x1="620" y1="182" x2="620" y2="952" stroke="#263B48"/>
+  <text x="670" y="206" class="ui label">WORDMARK</text>
+  <g transform="translate(670 252) scale(.78)" color="#EFF3F6"><use href="#wordmark"/></g>
+
+  <line x1="670" y1="418" x2="1474" y2="418" stroke="#263B48"/>
+  <text x="670" y="474" class="ui label">LOCKUP</text>
+  <g transform="translate(748 575) scale(1.28)"><use href="#balanced-t-color"/></g>
+  <g transform="translate(852 512) scale(.53)" color="#EFF3F6"><use href="#wordmark"/></g>
+
+  <line x1="670" y1="682" x2="1474" y2="682" stroke="#263B48"/>
+  <text x="670" y="738" class="ui label">APP ICON, MONOCROMÍA Y SIDEBAR</text>
+
+  <rect x="670" y="776" width="174" height="174" rx="39" fill="#111F2A" stroke="#354A57" stroke-width="2"/>
+  <g transform="translate(757 864) scale(.94)"><use href="#balanced-t-color"/></g>
+
+  <g transform="translate(970 864) scale(.94)" color="#EFF3F6"><use href="#balanced-t-mono"/></g>
+  <rect x="1100" y="776" width="174" height="174" rx="34" fill="#EFF3F6"/>
+  <g transform="translate(1187 864) scale(.94)" color="#08131D"><use href="#balanced-t-mono"/></g>
+
+  <g transform="translate(1390 864) scale(.48)"><use href="#balanced-t-color"/></g>
+  <text x="1341" y="929" class="ui" fill="#8193A0" font-size="16">SIDEBAR</text>
+</svg>

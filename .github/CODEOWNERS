@@ -1,0 +1,9 @@
+# Temporary ownership until the team is formed.
+* @DARONcin
+
+# Sensitive areas require explicit review.
+/docs/security/ @DARONcin
+/packages/security/ @DARONcin
+/services/gateway/ @DARONcin
+/services/project-core/ @DARONcin
+/infrastructure/ @DARONcin
