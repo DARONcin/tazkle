@@ -1,0 +1,73 @@
+name: Platform services
+
+on:
+  pull_request:
+    paths:
+      - "services/**"
+      - "packages/platform-*/**"
+      - "packages/service-kit/**"
+      - "infrastructure/**"
+      - "scripts/infra.mjs"
+      - ".dockerignore"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.base.json"
+      - ".github/workflows/platform-services.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "services/**"
+      - "packages/platform-*/**"
+      - "packages/service-kit/**"
+      - "infrastructure/**"
+      - "scripts/infra.mjs"
+      - ".dockerignore"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.base.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-services-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TAZKLE_POSTGRES_ADMIN_PASSWORD: ci-admin-password-placeholder-32bytes
+      TAZKLE_APP_DATABASE_PASSWORD: ci-application-password-placeholder-32bytes
+      TAZKLE_IDENTITY_DATABASE_PASSWORD: ci-identity-database-password-placeholder
+      TAZKLE_INTERNAL_IDENTITY_SECRET: ci-internal-identity-secret-at-least-32-bytes
+      TAZKLE_BETTER_AUTH_SECRET: ci-better-auth-secret-at-least-32-bytes
+      TAZKLE_OIDC_AUDIENCE: tazkle-local
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.19.0"
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck:services
+      - run: npm run build:services
+      - run: npm run test:services
+
+      - name: Validate Compose
+        run: npm run infra:config
+
+      - name: Start local platform
+        run: npm run infra:up:detached
+
+      - name: Verify migrations, idempotency, and tenant isolation
+        run: npm run test:domain:docker
+
+      - name: Stop local platform
+        if: always()
+        run: npm run infra:down

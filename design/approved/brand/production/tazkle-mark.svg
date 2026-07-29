@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="-84 -84 168 168" role="img" aria-labelledby="title desc">
+  <title id="title">Tazkle</title>
+  <desc id="desc">Una t minúscula ramificada con cuatro nodos de colores, contenida visualmente en un círculo invisible.</desc>
+  <defs>
+    <clipPath id="boundary"><circle cx="0" cy="0" r="72"/></clipPath>
+    <path id="branch" d="M0 0H26A26 26 0 0 0 52-26"/>
+  </defs>
+  <g clip-path="url(#boundary)" fill="none" stroke="#EFF3F6" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M0 0V-58"/>
+    <use href="#branch"/>
+    <use href="#branch" transform="rotate(180)"/>
+    <path d="M0 0V30C0 58 52 58 52 30V26"/>
+    <g stroke="#EFF3F6" stroke-width="3">
+      <circle cx="0" cy="-58" r="10" fill="#4F7CFF"/>
+      <circle cx="52" cy="-26" r="10" fill="#6DD6E7"/>
+      <circle cx="-52" cy="26" r="10" fill="#8C6BFF"/>
+      <circle cx="52" cy="26" r="10" fill="#F1B84B"/>
+    </g>
+  </g>
+</svg>

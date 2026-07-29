@@ -1,0 +1,338 @@
+name: tazkle-local
+
+services:
+  gateway:
+    build:
+      context: ${TAZKLE_BUILD_CONTEXT:-..}
+      dockerfile: infrastructure/docker/platform.Dockerfile
+    command:
+      - node
+      - services/gateway/dist/index.js
+    environment:
+      PORT: "8787"
+      PROJECT_CORE_URL: http://project-core:8788
+      TAZKI_URL: http://tazki:8789
+      AUTOMATION_URL: http://automation:8790
+      IDENTITY_URL: http://identity:8791
+      OIDC_ISSUER: ${TAZKLE_OIDC_ISSUER:-http://127.0.0.1:8787/api/auth}
+      OIDC_AUDIENCE: ${TAZKLE_OIDC_AUDIENCE:-tazkle-local}
+      OIDC_JWKS_URL: ${TAZKLE_OIDC_JWKS_URL:-http://identity:8791/api/auth/jwks}
+      ALLOW_INSECURE_LOCAL_OIDC: ${TAZKLE_ALLOW_INSECURE_LOCAL_OIDC:-true}
+      INTERNAL_IDENTITY_SECRET_FILE: /run/secrets/internal-identity-secret
+    secrets:
+      - internal-identity-secret
+    ports:
+      - "127.0.0.1:${TAZKLE_GATEWAY_PORT:-8787}:8787"
+    networks:
+      - edge
+      - services
+    depends_on:
+      identity:
+        condition: service_healthy
+      project-core:
+        condition: service_healthy
+      tazki:
+        condition: service_healthy
+      automation:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:8787/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  identity:
+    image: tazkle-local-identity
+    build:
+      context: ${TAZKLE_BUILD_CONTEXT:-..}
+      dockerfile: infrastructure/docker/platform.Dockerfile
+    command:
+      - node
+      - services/identity/dist/index.js
+    environment:
+      PORT: "8791"
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: tazkle
+      PGUSER: tazkle_identity
+      PGPASSWORD_FILE: /run/secrets/identity-db-password
+      BETTER_AUTH_URL: ${TAZKLE_BETTER_AUTH_URL:-http://127.0.0.1:8787/api/auth}
+      BETTER_AUTH_SECRET_FILE: /run/secrets/better-auth-secret
+      ALLOW_INSECURE_LOCAL_OIDC: ${TAZKLE_ALLOW_INSECURE_LOCAL_OIDC:-true}
+      TAZKLE_OIDC_CLIENT_ID: ${TAZKLE_OIDC_CLIENT_ID:-tazkle-macos}
+      TAZKLE_OIDC_REDIRECT_URI: app.tazkle.desktop:/oauth/callback
+      TAZKLE_OIDC_AUDIENCE: ${TAZKLE_OIDC_AUDIENCE:-tazkle-local}
+      GOOGLE_CLIENT_ID: ${TAZKLE_GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET_FILE: ${TAZKLE_GOOGLE_CLIENT_ID:+/run/secrets/google-oauth-secret}
+      MICROSOFT_CLIENT_ID: ${TAZKLE_MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET_FILE: ${TAZKLE_MICROSOFT_CLIENT_ID:+/run/secrets/microsoft-oauth-secret}
+      MICROSOFT_TENANT_ID: ${TAZKLE_MICROSOFT_TENANT_ID:-common}
+    secrets:
+      - identity-db-password
+      - better-auth-secret
+      - google-oauth-secret
+      - microsoft-oauth-secret
+    expose:
+      - "8791"
+    networks:
+      - services
+      - data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:8791/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  project-core:
+    image: tazkle-local-project-core
+    build:
+      context: ${TAZKLE_BUILD_CONTEXT:-..}
+      dockerfile: infrastructure/docker/platform.Dockerfile
+    command:
+      - node
+      - services/project-core/dist/index.js
+    environment:
+      PORT: "8788"
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: tazkle
+      PGUSER: tazkle_app
+      PGPASSWORD_FILE: /run/secrets/postgres-app-password
+      INTERNAL_IDENTITY_SECRET_FILE: /run/secrets/internal-identity-secret
+    secrets:
+      - postgres-app-password
+      - internal-identity-secret
+    expose:
+      - "8788"
+    networks:
+      - services
+      - data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:8788/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  migrate:
+    image: tazkle-local-project-core
+    command:
+      - node
+      - services/project-core/dist/migrate.js
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: tazkle
+      PGUSER: tazkle_admin
+      PGPASSWORD_FILE: /run/secrets/postgres-admin-password
+      MIGRATIONS_DIRECTORY: /workspace/infrastructure/postgres/migrations
+    secrets:
+      - postgres-admin-password
+    networks:
+      - data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  tazki:
+    build:
+      context: ${TAZKLE_BUILD_CONTEXT:-..}
+      dockerfile: infrastructure/docker/platform.Dockerfile
+    command:
+      - node
+      - services/tazki/dist/index.js
+    environment:
+      PORT: "8789"
+      PROJECT_CORE_URL: http://project-core:8788
+    expose:
+      - "8789"
+    networks:
+      - services
+    depends_on:
+      project-core:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:8789/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  automation:
+    build:
+      context: ${TAZKLE_BUILD_CONTEXT:-..}
+      dockerfile: infrastructure/docker/platform.Dockerfile
+    command:
+      - node
+      - services/automation/dist/index.js
+    environment:
+      PORT: "8790"
+      PROJECT_CORE_URL: http://project-core:8788
+    expose:
+      - "8790"
+    networks:
+      - services
+    depends_on:
+      project-core:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:8790/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  domain-smoke:
+    profiles:
+      - test
+    image: tazkle-local-project-core
+    command:
+      - node
+      - /smoke/smoke-project-domain.mjs
+    environment:
+      PROJECT_CORE_URL: http://project-core:8788
+      INTERNAL_IDENTITY_SECRET_FILE: /run/secrets/internal-identity-secret
+    secrets:
+      - internal-identity-secret
+    volumes:
+      - ../scripts/smoke-project-domain.mjs:/smoke/smoke-project-domain.mjs:ro
+    networks:
+      - services
+    depends_on:
+      project-core:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  postgres:
+    image: postgres:17.6-alpine3.22
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=10
+      - -c
+      - max_wal_senders=10
+    environment:
+      POSTGRES_DB: tazkle
+      POSTGRES_USER: tazkle_admin
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres-admin-password
+      TAZKLE_APP_DATABASE_PASSWORD_FILE: /run/secrets/postgres-app-password
+      TAZKLE_IDENTITY_DATABASE_PASSWORD_FILE: /run/secrets/identity-db-password
+    secrets:
+      - postgres-admin-password
+      - postgres-app-password
+      - identity-db-password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U tazkle_admin -d tazkle
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+networks:
+  edge:
+    driver: bridge
+  services:
+    driver: bridge
+    internal: true
+  data:
+    driver: bridge
+    internal: true
+
+volumes:
+  postgres-data:
+
+secrets:
+  postgres-admin-password:
+    file: ${TAZKLE_SECRETS_DIR:?set TAZKLE_SECRETS_DIR}/postgres-admin-password
+  postgres-app-password:
+    file: ${TAZKLE_SECRETS_DIR:?set TAZKLE_SECRETS_DIR}/postgres-app-password
+  identity-db-password:
+    file: ${TAZKLE_SECRETS_DIR:?set TAZKLE_SECRETS_DIR}/identity-db-password
+  internal-identity-secret:
+    file: ${TAZKLE_SECRETS_DIR:?set TAZKLE_SECRETS_DIR}/internal-identity-secret
+  better-auth-secret:
+    file: ${TAZKLE_SECRETS_DIR:?set TAZKLE_SECRETS_DIR}/better-auth-secret
+  google-oauth-secret:
+    file: ${TAZKLE_SECRETS_DIR:?set TAZKLE_SECRETS_DIR}/google-oauth-secret
+  microsoft-oauth-secret:
+    file: ${TAZKLE_SECRETS_DIR:?set TAZKLE_SECRETS_DIR}/microsoft-oauth-secret

@@ -1,0 +1,38 @@
+{
+  "name": "tazkle-platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "workspaces": [
+    "packages/platform-*",
+    "packages/service-kit",
+    "services/*"
+  ],
+  "scripts": {
+    "build:packages": "npm run build -w @tazkle/platform-contracts && npm run build -w @tazkle/service-kit",
+    "build:services": "npm run build:packages && npm run build -w @tazkle/identity && npm run build -w @tazkle/gateway && npm run build -w @tazkle/project-core && npm run build -w @tazkle/tazki && npm run build -w @tazkle/automation",
+    "typecheck:services": "npm run build:packages && npm run typecheck --workspaces --if-present",
+    "test:services": "npm run build:packages && npm run test --workspaces --if-present",
+    "test:domain:docker": "node scripts/infra.mjs domain-smoke",
+    "test:identity:local": "node scripts/smoke-identity.mjs",
+    "dev:gateway": "npm run build:packages && npm run dev -w @tazkle/gateway",
+    "dev:identity": "npm run build:packages && npm run dev -w @tazkle/identity",
+    "dev:core": "npm run build:packages && npm run dev -w @tazkle/project-core",
+    "dev:tazki": "npm run build:packages && npm run dev -w @tazkle/tazki",
+    "dev:automation": "npm run build:packages && npm run dev -w @tazkle/automation",
+    "infra:init": "node scripts/infra.mjs init",
+    "infra:config": "node scripts/infra.mjs config",
+    "infra:up": "node scripts/infra.mjs up",
+    "infra:up:detached": "node scripts/infra.mjs up-detached",
+    "infra:down": "node scripts/infra.mjs down"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "@types/pg": "8.20.0",
+    "tsx": "4.23.1",
+    "typescript": "5.9.3"
+  }
+}

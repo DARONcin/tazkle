@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="-84 -84 168 168" role="img" aria-label="Tazkle">
+  <defs>
+    <clipPath id="boundary"><circle cx="0" cy="0" r="72"/></clipPath>
+    <path id="branch" d="M0 0H26A26 26 0 0 0 52-26"/>
+  </defs>
+  <g clip-path="url(#boundary)" fill="none" stroke="#EDF2F6" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M0 0V-58"/>
+    <use href="#branch"/>
+    <use href="#branch" transform="rotate(180)"/>
+    <path d="M0 0V30C0 58 52 58 52 30V26"/>
+    <g fill="#EDF2F6" stroke="none">
+      <circle cx="0" cy="-58" r="10"/>
+      <circle cx="52" cy="-26" r="10"/>
+      <circle cx="-52" cy="26" r="10"/>
+      <circle cx="52" cy="26" r="10"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tazkle Security Audit"
+  short_description: "Audita seguridad y controles de Tazkle"
+  default_prompt: "Use $tazkle-security-audit to audit this Tazkle change for security risks and missing controls."

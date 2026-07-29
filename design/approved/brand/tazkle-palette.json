@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "Tazkle",
+  "version": 1,
+  "brand": {
+    "blue": "#4F7CFF",
+    "violet": "#8C6BFF",
+    "cyan": "#6DD6E7",
+    "amber": "#F1B84B",
+    "green": "#75C66B",
+    "outlineLight": "#EFF3F6"
+  },
+  "semantic": {
+    "actionPrimary": "brand.blue",
+    "relationship": "brand.violet",
+    "assistantProposal": "brand.cyan",
+    "warning": "brand.amber",
+    "success": "brand.green"
+  },
+  "semanticResolved": {
+    "dark": {
+      "actionPrimary": "#668CFF",
+      "relationship": "#9A7CFF",
+      "assistantProposal": "#6DD6E7",
+      "warning": "#F1B84B",
+      "success": "#75C66B"
+    },
+    "light": {
+      "actionPrimary": "#315CCB",
+      "relationship": "#6546CC",
+      "assistantProposal": "#08788A",
+      "warning": "#825600",
+      "success": "#2F762A"
+    }
+  },
+  "themes": {
+    "dark": {
+      "canvas": "#08131D",
+      "panel": "#132430",
+      "elevated": "#1A303E",
+      "contentPrimary": "#EDF2F6",
+      "contentSecondary": "#A9B7C0"
+    },
+    "light": {
+      "canvas": "#F3F6F8",
+      "panel": "#FFFFFF",
+      "elevated": "#E8EEF3",
+      "contentPrimary": "#14212A",
+      "contentSecondary": "#50616D"
+    },
+    "increasedContrast": {
+      "canvasDark": "#02070B",
+      "panelDark": "#0B1720",
+      "panelLight": "#F8FAFC"
+    }
+  }
+}

@@ -17,14 +17,18 @@ La primera versión usa atajos predeterminados y no personalizables.
 |---|---|
 | Paleta de comandos | `⌘K` |
 | Buscar | `⌘F` |
-| Nuevo bloque | `⌘N` |
+| Nuevo proyecto | `⌘N` |
+| Nuevo bloque | `⇧⌘B` |
+| Datos de factibilidad y cotización | `⇧⌘E` |
 | Conectar bloques | `⌘L` |
+| Abrir o cerrar Tazki | `⌥⌘T` |
 | Duplicar | `⌘D` |
 | Eliminar selección | `⌫` |
 | Deshacer | `⌘Z` |
 | Rehacer | `⇧⌘Z` |
 | Mostrar u ocultar sidebar | `⌃⌘S` |
 | Mostrar inspector | `⌥⌘I` |
+| Volver al origen del lienzo | `⌘0` |
 | Ajustar mapa a ventana | `⇧⌘F` |
 | Referencia de atajos | `⌘/` |
 
