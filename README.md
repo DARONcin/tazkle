@@ -6,7 +6,10 @@ La primera entrega busca que un equipo pueda transformar una idea de aplicación
 
 ## Estado
 
-**Preproducción conceptual.** Este repositorio contiene decisiones de producto, arquitectura, seguridad, accesibilidad y el lenguaje visual aprobado. Todavía no contiene una implementación productiva.
+**Prototipo técnico en construcción.** El repositorio contiene la definición de
+producto, el cliente nativo de macOS y una primera base ejecutable de la
+plataforma. Los cuatro servicios y PostgreSQL ya pueden levantarse localmente;
+identidad, sincronización y despliegue administrado todavía no son productivos.
 
 ## Primer resultado útil
 
@@ -39,6 +42,9 @@ Un monorepo no implica un monolito: cada servicio tendrá límites, contratos y 
 - [Accesibilidad](docs/ux/accessibility.md)
 - [Atajos de teclado](docs/ux/keyboard-shortcuts.md)
 - [Índice visual](design/index.md)
+- [Infraestructura local](infrastructure/README.md)
+- [Decisión de runtime](docs/architecture/adr/0005-service-runtime.md)
+- [Decisión de identidad](docs/architecture/adr/0006-identity-and-project-boundary.md)
 
 ## Skills de proyecto
 
@@ -53,7 +59,7 @@ Las skills viven en `.agents/skills` y forman parte de las reglas versionadas de
 .agents/skills/tazkle-ci-quality/scripts/run-quality-gates.sh
 ```
 
-## Estructura futura
+## Estructura
 
 ```text
 apps/           Superficies macOS y web

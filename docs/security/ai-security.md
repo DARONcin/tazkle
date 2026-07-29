@@ -41,3 +41,15 @@ flowchart LR
 - Una acción crítica vuelve a Gateway y Project Core y requiere aprobación.
 
 No se promete eliminar completamente prompt injection; se limita su impacto y se conserva una decisión humana verificable.
+
+## Prototipo del panel macOS
+
+- El panel local muestra recomendaciones deterministas de demostración y no llama
+  a proveedores externos.
+- El contexto visible se limita al apartado, la subvista y, en Mapa o
+  Arquitectura, el bloque seleccionado.
+- Perfil y configuración queda fuera del espacio de Tazki.
+- Preparar una variante no modifica el grafo, no persiste una aprobación y no
+  simula una respuesta remota.
+- Las preguntas escritas se mantienen sólo en estado efímero y se limitan a 500
+  caracteres; la interfaz declara que no fueron enviadas.

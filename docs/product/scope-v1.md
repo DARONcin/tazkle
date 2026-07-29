@@ -10,6 +10,10 @@ Validar el recorrido completo de una aplicación web ficticia desde la captura d
 - Proyecto con un único propietario y un responsable final.
 - Captura combinada: texto libre, entrevista, plantilla o lienzo.
 - Plantilla base para aplicaciones web.
+- Selector inicial de frontend, lenguaje backend, API, autenticación, base de
+  datos e infraestructura.
+- Generación de servicios conectados y advertencias de compatibilidad a partir
+  de la selección tecnológica.
 - Catálogo inicial de bloques sin tipos personalizados.
 - Bloques anidados y relaciones tipadas.
 - Advertencias para relaciones discutibles y bloqueo solo de contradicciones graves.
@@ -64,3 +68,23 @@ La gestión completa de tareas y sprints pertenece al producto futuro; en la pri
 ## Criterio de éxito
 
 Un equipo puede convertir una idea de aplicación web en un proyecto coherente, evaluado y cotizado en menos de dos horas, sin construir manualmente varios documentos separados.
+
+## Corte funcional nativo actual
+
+- El expediente local ya captura problema, objetivo, evidencia de mercado,
+  plazo, capacidad, presupuesto, horas, tarifas, servicios, reserva y margen.
+- Un motor determinista calcula costo interno, precio propuesto, incertidumbre,
+  confianza y las diez dimensiones de factibilidad desde el grafo vigente.
+- Los resultados insuficientes generan condiciones o una recomendación de
+  replanteamiento; no bloquean la búsqueda de una variante y no aprueban el
+  proyecto.
+- El perfil se persiste en SQLite por proyecto y continúa disponible sin
+  conexión.
+- El cliente OIDC de macOS implementa acceso con correo, PKCE, Keychain y lectura
+  segura de `userinfo`; falta configurar un proveedor real y confirmar el flujo
+  de extremo a extremo.
+- Una base local nueva parte de un proyecto vacío. Cuenta, organización y equipo
+  no fabrican personas, roles, costos ni capacidad mientras Project Core no
+  entregue esos datos.
+- Sincronización remota, aprobación y proveedor de IA permanecen fuera de este
+  corte.

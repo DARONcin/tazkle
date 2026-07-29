@@ -8,10 +8,11 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[4]
 LINK = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
+SKIP_PARTS = {".git", ".next", ".vinext", "dist", "node_modules"}
 errors: list[str] = []
 
 for document in sorted(ROOT.rglob("*.md")):
-    if ".git" in document.parts:
+    if SKIP_PARTS.intersection(document.parts):
         continue
     text = document.read_text(encoding="utf-8")
     for target in LINK.findall(text):

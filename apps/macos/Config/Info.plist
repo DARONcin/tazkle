@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>es</string>
+    <key>CFBundleDisplayName</key>
+    <string>Tazkle</string>
+    <key>CFBundleExecutable</key>
+    <string>Tazkle</string>
+    <key>CFBundleIconFile</key>
+    <string>Tazkle.icns</string>
+    <key>CFBundleIdentifier</key>
+    <string>app.tazkle.desktop</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>Tazkle</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLName</key>
+            <string>app.tazkle.desktop.oauth</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>app.tazkle.desktop</string>
+            </array>
+        </dict>
+    </array>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.developer-tools</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>TazkleOIDCClientID</key>
+    <string></string>
+    <key>TazkleOIDCIssuer</key>
+    <string></string>
+    <key>TazkleOIDCRedirectURI</key>
+    <string>app.tazkle.desktop:/oauth/callback</string>
+    <key>TazkleOIDCResource</key>
+    <string></string>
+</dict>
+</plist>

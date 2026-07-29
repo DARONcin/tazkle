@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Tazkle">
+  <defs>
+    <clipPath id="boundary"><circle cx="0" cy="0" r="72"/></clipPath>
+    <path id="branch" d="M0 0H26A26 26 0 0 0 52-26"/>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#132430"/>
+      <stop offset="1" stop-color="#08131D"/>
+    </linearGradient>
+  </defs>
+  <rect x="48" y="48" width="928" height="928" rx="210" fill="url(#background)"/>
+  <g transform="translate(512 512) scale(4.75)" clip-path="url(#boundary)" fill="none" stroke="#EFF3F6" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M0 0V-58"/>
+    <use href="#branch"/>
+    <use href="#branch" transform="rotate(180)"/>
+    <path d="M0 0V30C0 58 52 58 52 30V26"/>
+    <g stroke="#EFF3F6" stroke-width="3">
+      <circle cx="0" cy="-58" r="10" fill="#4F7CFF"/>
+      <circle cx="52" cy="-26" r="10" fill="#6DD6E7"/>
+      <circle cx="-52" cy="26" r="10" fill="#8C6BFF"/>
+      <circle cx="52" cy="26" r="10" fill="#F1B84B"/>
+    </g>
+  </g>
+</svg>

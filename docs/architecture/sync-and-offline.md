@@ -26,6 +26,9 @@ stateDiagram-v2
 ## Reglas
 
 - El cliente usa identificadores generados sin conexión.
+- Cada proyecto local conserva un identificador, plantilla, grafo y perfil de
+  planeación separados; cambiar de proyecto carga únicamente sus bloques,
+  relaciones, supuestos, horas y tarifas.
 - Cada entidad mutable mantiene una versión para control optimista.
 - Los comandos críticos usan claves de idempotencia.
 - Una versión aprobada no se fusiona silenciosamente.

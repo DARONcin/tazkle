@@ -25,7 +25,9 @@ if [[ -n "$secret_files" ]]; then
   failure=1
 fi
 
-large_files="$(find . -path './.git' -prune -o -type f -size +10M -print)"
+large_files="$(find . \
+  \( -path './.git' -o -path './.build' -o -path './DerivedData' -o -path '*/node_modules' \) -prune \
+  -o -type f -size +10M -print)"
 if [[ -n "$large_files" ]]; then
   echo "security-baseline: files larger than 10 MB found:"
   printf '%s\n' "$large_files"

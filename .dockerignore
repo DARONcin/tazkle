@@ -1,0 +1,15 @@
+.git
+.build
+node_modules
+**/node_modules
+**/dist
+coverage
+artifacts
+reports
+apps/landing
+design
+docs
+*.sqlite
+*.sqlite3
+.env
+.env.*

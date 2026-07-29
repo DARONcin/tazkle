@@ -15,7 +15,8 @@ if [[ ${#paths[@]} -eq 0 ]]; then
 fi
 
 mapfile_name="${TMPDIR:-/tmp}/tazkle-raw-colors.$$"
-trap 'rm -f "$mapfile_name"' EXIT
+named_color_file="${TMPDIR:-/tmp}/tazkle-named-colors.$$"
+trap 'rm -f "$mapfile_name" "$named_color_file"' EXIT
 
 if rg -n --glob '*.swift' --glob '*.ts' --glob '*.tsx' --glob '*.css' \
   --glob '!packages/design-system/**' '#[0-9A-Fa-f]{6}\b' "${paths[@]}" >"$mapfile_name"; then
@@ -23,5 +24,16 @@ if rg -n --glob '*.swift' --glob '*.ts' --glob '*.tsx' --glob '*.css' \
   sed -n '1,120p' "$mapfile_name"
   exit 1
 fi
+
+if rg -n --glob '*.swift' --glob '!packages/design-system/**' \
+  'Color\.(red|orange|yellow|green|blue|purple|pink|cyan|mint|teal|indigo|brown)\b|foregroundStyle\(\.(red|orange|yellow|green|blue|purple|pink|cyan|mint|teal|indigo|brown)\)|\.tint\(\.(red|orange|yellow|green|blue|purple|pink|cyan|mint|teal|indigo|brown)\)' \
+  "${paths[@]}" >"$named_color_file"; then
+  echo "visual-token-check: named system colors found outside the design-system package"
+  sed -n '1,120p' "$named_color_file"
+  exit 1
+fi
+
+"$root/scripts/sync-brand-assets.sh" --check
+python3 "$root/scripts/check-brand-consistency.py"
 
 echo "visual-token-check: passed"
