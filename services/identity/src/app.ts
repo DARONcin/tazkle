@@ -1,6 +1,10 @@
 import { serviceCapabilitySchema } from "@tazkle/platform-contracts";
 import { createServiceApp } from "@tazkle/service-kit";
 import type { DependencyStatus } from "@tazkle/platform-contracts";
+import {
+  accountClientScript,
+  consentClientScript,
+} from "./client-scripts.js";
 import { consentPage, signInPage, signUpPage } from "./pages.js";
 import type { SocialProviderID } from "./config.js";
 
@@ -51,6 +55,14 @@ export function createIdentityApp({
     return identityHTMLResponse(context.req.url, consentPage);
   });
 
+  app.get("/identity/client/account.js", () => {
+    return identityScriptResponse(accountClientScript);
+  });
+
+  app.get("/identity/client/consent.js", () => {
+    return identityScriptResponse(consentClientScript);
+  });
+
   app.get(
     "/.well-known/oauth-authorization-server/api/auth",
     (context) => auth.handler(context.req.raw),
@@ -61,6 +73,18 @@ export function createIdentityApp({
   });
 
   return app;
+}
+
+function identityScriptResponse(script: string): Response {
+  return new Response(script, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/javascript; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Cross-Origin-Resource-Policy": "same-origin",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 }
 
 function identityHTMLResponse(

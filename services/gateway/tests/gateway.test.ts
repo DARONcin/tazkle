@@ -121,6 +121,34 @@ test("gateway proxies only the fixed identity service and preserves auth cookies
   assert.match(response.headers.get("set-cookie") ?? "", /HttpOnly/);
 });
 
+test("gateway exposes only the allowlisted same-origin identity client scripts", async () => {
+  let target = "";
+  const app = createGatewayApp({
+    urls,
+    accessTokens,
+    internalActors,
+    fetchImplementation: async (input) => {
+      target = input.toString();
+      return new Response("console.log('identity');", {
+        headers: {
+          "Content-Type": "application/javascript; charset=utf-8",
+        },
+      });
+    },
+  });
+
+  const response = await app.request("/identity/client/account.js");
+  const missing = await app.request("/identity/client/unknown.js");
+
+  assert.equal(target, "http://identity.test/identity/client/account.js");
+  assert.equal(response.status, 200);
+  assert.match(
+    response.headers.get("content-type") ?? "",
+    /application\/javascript/,
+  );
+  assert.equal(missing.status, 404);
+});
+
 test("gateway turns Better Auth browser navigation JSON into a bounded redirect", async () => {
   const app = createGatewayApp({
     urls,

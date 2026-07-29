@@ -131,7 +131,13 @@ export function createGatewayApp({
     (context) => proxyIdentityRequest(context, urls.identity, fetchImplementation),
   );
 
-  for (const pagePath of ["/sign-in", "/sign-up", "/consent"]) {
+  for (const pagePath of [
+    "/sign-in",
+    "/sign-up",
+    "/consent",
+    "/identity/client/account.js",
+    "/identity/client/consent.js",
+  ]) {
     app.get(pagePath, (context) => {
       return proxyIdentityRequest(context, urls.identity, fetchImplementation);
     });

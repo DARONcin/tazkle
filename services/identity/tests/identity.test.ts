@@ -20,7 +20,7 @@ test("identity publishes its bounded capability", async () => {
   });
 });
 
-test("sign-in page has a nonce CSP, accessible status and no reflected script", async () => {
+test("sign-in page has a strict CSP, accessible status and no reflected script", async () => {
   const app = createIdentityApp({
     auth: {
       handler: async () => new Response(null, { status: 204 }),
@@ -35,8 +35,10 @@ test("sign-in page has a nonce CSP, accessible status and no reflected script", 
 
   assert.equal(response.status, 200);
   assert.match(csp, /default-src 'none'/);
-  assert.match(csp, /script-src 'nonce-/);
+  assert.match(csp, /script-src 'self'/);
   assert.match(body, /role="status"/);
+  assert.match(body, /src="\/identity\/client\/account\.js" defer/);
+  assert.doesNotMatch(body, /addEventListener/);
   assert.doesNotMatch(body, /<\/script><script>alert/);
   assert.match(body, /%3C%2Fscript%3E/);
   assert.doesNotMatch(body, /data-social-provider="/);
@@ -58,7 +60,7 @@ test("sign-in page exposes only configured social providers", async () => {
   assert.match(body, /Continuar con Google/);
   assert.match(body, /data-social-provider="microsoft"/);
   assert.match(body, /Continuar con Microsoft/);
-  assert.match(body, /oauth_query: oauthQuery/);
+  assert.match(body, /name="oauth_query"/);
 });
 
 test("sign-up page keeps browser validation and an atomic live status", async () => {
@@ -72,12 +74,56 @@ test("sign-up page keeps browser validation and an atomic live status", async ()
   const body = await response.text();
 
   assert.equal(response.status, 200);
-  assert.match(body, /<form id="account-form">/);
+  assert.match(body, /<form id="account-form" data-mode="signup">/);
   assert.doesNotMatch(body, /<form id="account-form" novalidate>/);
-  assert.match(body, /form\.reportValidity\(\)/);
   assert.match(body, /aria-live="polite" aria-atomic="true"/);
-  assert.match(body, /\/api\/auth\/oauth2\/continue/);
-  assert.match(body, /created: true/);
+  assert.match(body, /name="oauth_query"/);
+  assert.match(body, /src="\/identity\/client\/account\.js" defer/);
+});
+
+test("account client script performs validated sign-up and OAuth continuation", async () => {
+  const app = createIdentityApp({
+    auth: {
+      handler: async () => new Response(null, { status: 204 }),
+    },
+  });
+
+  const response = await app.request("/identity/client/account.js");
+  const script = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(
+    response.headers.get("content-type") ?? "",
+    /application\/javascript/,
+  );
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.match(script, /form\?\.addEventListener\("submit"/);
+  assert.match(script, /form\.reportValidity\(\)/);
+  assert.ok(
+    script.indexOf("new FormData(form)") <
+      script.indexOf('setBusy(true, "Validando de forma segura…")'),
+  );
+  assert.match(script, /\/api\/auth\/sign-up\/email/);
+  assert.match(script, /\/api\/auth\/oauth2\/continue/);
+  assert.match(script, /created: true/);
+});
+
+test("consent page loads a same-origin script that submits the decision", async () => {
+  const app = createIdentityApp({
+    auth: {
+      handler: async () => new Response(null, { status: 204 }),
+    },
+  });
+
+  const page = await app.request("/consent?client_id=tazkle-macos");
+  const pageBody = await page.text();
+  const scriptResponse = await app.request("/identity/client/consent.js");
+  const script = await scriptResponse.text();
+
+  assert.match(pageBody, /name="oauth_query"/);
+  assert.match(pageBody, /src="\/identity\/client\/consent\.js" defer/);
+  assert.match(script, /form\?\.addEventListener\("submit"/);
+  assert.match(script, /\/api\/auth\/oauth2\/consent/);
 });
 
 test("account mode links restart authorization without reusing signed state", async () => {

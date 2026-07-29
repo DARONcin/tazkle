@@ -11,8 +11,11 @@ dominio: Project Core sigue resolviendo membresías y permisos; Identity sólo
 crea cuentas, sesiones y tokens.
 
 Gateway es el único puerto público. Publica por proxy las rutas
-`/api/auth/*`, `/sign-in`, `/sign-up` y `/consent`, y nunca permite elegir el
-destino interno desde una petición.
+`/api/auth/*`, `/sign-in`, `/sign-up`, `/consent` y los dos scripts de cliente
+allowlisted bajo `/identity/client/`; nunca permite elegir el destino interno
+desde una petición. Las páginas no incorporan manejadores JavaScript inline:
+los cargan desde el mismo origen con `script-src 'self'`, mientras los estilos
+conservan un nonce por respuesta.
 
 ## Cliente macOS
 

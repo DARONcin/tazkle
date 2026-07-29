@@ -22,40 +22,6 @@ export function signUpPage(
 
 export function consentPage(search: string): IdentityPage {
   const nonce = randomBytes(18).toString("base64");
-  const query = safeInlineJSON(normalizedQuery(search));
-  const script = `
-const oauthQuery = ${query};
-const form = document.querySelector("#consent-form");
-const status = document.querySelector("#status");
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const submitter = event.submitter;
-  const accept = submitter?.value === "accept";
-  setBusy(true);
-  try {
-    const response = await fetch("/api/auth/oauth2/consent", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Accept": "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify({ accept, oauth_query: oauthQuery })
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(userMessage(payload));
-    if (!payload.url) throw new Error("No fue posible volver a Tazkle.");
-    window.location.assign(payload.url);
-  } catch (error) {
-    status.textContent = safeMessage(error);
-    status.hidden = false;
-    setBusy(false);
-  }
-});
-function setBusy(value) {
-  for (const control of form.elements) control.disabled = value;
-  status.textContent = value ? "Guardando tu decisión…" : "";
-  status.hidden = false;
-}
-${sharedScriptHelpers()}
-`;
 
   return {
     contentSecurityPolicy: contentSecurityPolicy(nonce),
@@ -75,6 +41,7 @@ ${sharedScriptHelpers()}
               <li>Usar el acceso únicamente con los servicios de Tazkle.</li>
             </ul>
             <form id="consent-form">
+              <input type="hidden" name="oauth_query" value="${escapeAttribute(normalizedQuery(search))}" />
               <p id="status" class="status" role="status" aria-live="polite" hidden></p>
               <div class="actions split">
                 <button class="button secondary" type="submit" name="decision" value="deny">Cancelar</button>
@@ -84,7 +51,7 @@ ${sharedScriptHelpers()}
           </section>
         </main>
       `,
-      script,
+      scriptSource: "/identity/client/consent.js",
     }),
   };
 }
@@ -95,7 +62,6 @@ function accountPage(
   socialProviders: readonly SocialProviderID[],
 ): IdentityPage {
   const nonce = randomBytes(18).toString("base64");
-  const query = safeInlineJSON(normalizedQuery(search));
   const isSignUp = mode === "signup";
   const title = isSignUp ? "Crear cuenta" : "Entrar a Tazkle";
   const alternateText = isSignUp
@@ -106,90 +72,6 @@ function accountPage(
     isSignUp ? "signin" : "signup",
   );
   const submitText = isSignUp ? "Crear cuenta y continuar" : "Continuar";
-  const script = `
-const oauthQuery = ${query};
-const mode = ${JSON.stringify(mode)};
-const form = document.querySelector("#account-form");
-const status = document.querySelector("#status");
-for (const button of document.querySelectorAll("[data-social-provider]")) {
-  button.addEventListener("click", async () => {
-    const provider = button.dataset.socialProvider;
-    if (!provider) return;
-    setBusy(true, provider === "google"
-      ? "Conectando con Google…"
-      : "Conectando con Microsoft…");
-    try {
-      const response = await fetch("/api/auth/sign-in/social", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Accept": "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, oauth_query: oauthQuery })
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(userMessage(payload));
-      if (!payload.url) throw new Error("El proveedor no devolvió una ruta segura de acceso.");
-      window.location.assign(payload.url);
-    } catch (error) {
-      status.textContent = safeMessage(error);
-      status.hidden = false;
-      setBusy(false);
-    }
-  });
-}
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!form.reportValidity()) return;
-  setBusy(true, "Validando de forma segura…");
-  const data = new FormData(form);
-  const body = {
-    email: String(data.get("email") || "").trim(),
-    password: String(data.get("password") || ""),
-    oauth_query: oauthQuery,
-    rememberMe: true
-  };
-  if (mode === "signup") body.name = String(data.get("name") || "").trim();
-  try {
-    const response = await fetch(
-      mode === "signup" ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email",
-      {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Accept": "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      }
-    );
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(userMessage(payload));
-    if (mode === "signup") {
-      const continueResponse = await fetch("/api/auth/oauth2/continue", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Accept": "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ created: true, oauth_query: oauthQuery })
-      });
-      const continuePayload = await continueResponse.json().catch(() => ({}));
-      if (!continueResponse.ok) throw new Error(userMessage(continuePayload));
-      if (!continuePayload.url) throw new Error("No fue posible continuar con la autorización.");
-      window.location.assign(continuePayload.url);
-      return;
-    }
-    if (!payload.url) throw new Error("No fue posible volver a Tazkle.");
-    window.location.assign(payload.url);
-  } catch (error) {
-    status.textContent = safeMessage(error);
-    status.hidden = false;
-    setBusy(false);
-  }
-});
-function setBusy(value, message = "") {
-  for (const control of document.querySelectorAll("button,input")) {
-    control.disabled = value;
-  }
-  status.textContent = value ? message : "";
-  status.hidden = false;
-}
-${sharedScriptHelpers()}
-`;
 
   return {
     contentSecurityPolicy: contentSecurityPolicy(nonce),
@@ -204,7 +86,8 @@ ${sharedScriptHelpers()}
             <h1 id="page-title">${title}</h1>
             <p class="lead">Conecta proyectos, colaboración y sincronización con una cuenta segura.</p>
             ${socialProviderButtons(socialProviders)}
-            <form id="account-form">
+            <form id="account-form" data-mode="${mode}">
+              <input type="hidden" name="oauth_query" value="${escapeAttribute(normalizedQuery(search))}" />
               ${
                 isSignUp
                   ? `<label for="name">Nombre</label>
@@ -228,7 +111,7 @@ ${sharedScriptHelpers()}
           <p class="privacy-note">El acceso ocurre en una ventana segura del sistema. Puedes seguir trabajando localmente sin conectar una cuenta.</p>
         </main>
       `,
-      script,
+      scriptSource: "/identity/client/account.js",
     }),
   };
 }
@@ -237,12 +120,12 @@ function documentShell({
   title,
   nonce,
   content,
-  script,
+  scriptSource,
 }: {
   title: string;
   nonce: string;
   content: string;
-  script: string;
+  scriptSource: string;
 }): string {
   return `<!doctype html>
 <html lang="es">
@@ -294,7 +177,7 @@ function documentShell({
 </head>
 <body>
   ${content}
-  <script nonce="${nonce}">${script}</script>
+  <script src="${escapeAttribute(scriptSource)}" defer></script>
 </body>
 </html>`;
 }
@@ -345,25 +228,6 @@ function socialProviderButtons(
     <div class="divider" aria-hidden="true"><span>o usa tu correo</span></div>`;
 }
 
-function sharedScriptHelpers(): string {
-  return `
-function userMessage(payload) {
-  const code = payload?.code || payload?.error?.code;
-  if (code === "INVALID_EMAIL_OR_PASSWORD") return "El correo o la contraseña no coinciden.";
-  if (code === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL") return "Ya existe una cuenta con ese correo.";
-  if (code === "PASSWORD_TOO_SHORT") return "La contraseña debe tener al menos 12 caracteres.";
-  if (code === "INVALID_EMAIL") return "Escribe un correo válido.";
-  if (code === "PROVIDER_NOT_FOUND") return "Ese proveedor todavía no está configurado.";
-  if (code === "OAUTH_LINK_ERROR") return "No fue posible asociar la cuenta del proveedor.";
-  return "No fue posible completar el acceso. Revisa los datos e inténtalo nuevamente.";
-}
-function safeMessage(error) {
-  return error instanceof Error && error.message
-    ? error.message
-    : "No fue posible completar el acceso.";
-}`;
-}
-
 function normalizedQuery(search: string): string {
   return search.startsWith("?") ? search.slice(1) : search;
 }
@@ -395,13 +259,6 @@ function authorizationRestartURL(
   return `/api/auth/oauth2/authorize?${next.toString()}`;
 }
 
-function safeInlineJSON(value: string): string {
-  return JSON.stringify(value)
-    .replaceAll("<", "\\u003c")
-    .replaceAll(">", "\\u003e")
-    .replaceAll("&", "\\u0026");
-}
-
 function escapeHTML(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -419,7 +276,7 @@ function contentSecurityPolicy(nonce: string): string {
   return [
     "default-src 'none'",
     `style-src 'nonce-${nonce}'`,
-    `script-src 'nonce-${nonce}'`,
+    "script-src 'self'",
     "connect-src 'self'",
     "img-src 'self' data:",
     "font-src 'self'",
