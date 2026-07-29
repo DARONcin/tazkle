@@ -4,6 +4,8 @@ import { jwt } from "better-auth/plugins";
 import type { Pool } from "pg";
 import type { IdentityConfiguration } from "./config.js";
 
+export const authorizationCodeLifetimeSeconds = 60 * 10;
+
 export function createIdentityAuth(
   configuration: IdentityConfiguration,
   database: Pool,
@@ -109,7 +111,7 @@ export function createIdentityAuth(
         accessTokenExpiresIn: 60 * 15,
         idTokenExpiresIn: 60 * 15,
         refreshTokenExpiresIn: 60 * 60 * 24 * 30,
-        codeExpiresIn: 60 * 5,
+        codeExpiresIn: authorizationCodeLifetimeSeconds,
         grantTypes: ["authorization_code", "refresh_token"],
         allowDynamicClientRegistration: false,
         allowUnauthenticatedClientRegistration: false,

@@ -115,7 +115,9 @@ function showError(error) {
 }
 
 function userMessage(payload) {
-  const code = payload?.code || payload?.error?.code;
+  const directError =
+    typeof payload?.error === "string" ? payload.error : undefined;
+  const code = payload?.code || payload?.error?.code || directError;
   if (code === "INVALID_EMAIL_OR_PASSWORD") {
     return "El correo o la contraseña no coinciden.";
   }
@@ -134,6 +136,9 @@ function userMessage(payload) {
   }
   if (code === "OAUTH_LINK_ERROR") {
     return "No fue posible asociar la cuenta del proveedor.";
+  }
+  if (code === "invalid_signature" || code === "INVALID_SIGNATURE") {
+    return "Esta ventana segura expiró. Vuelve a Tazkle, cancela el intento y abre Crear cuenta nuevamente.";
   }
   return "No fue posible completar el acceso. Revisa los datos e inténtalo nuevamente.";
 }

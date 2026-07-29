@@ -60,6 +60,12 @@ const authorizationResponse = await request(authorizationURL, {
 assert.equal(authorizationResponse.status, 302);
 const signUpLocation = requiredLocation(authorizationResponse);
 assert.equal(signUpLocation.pathname, "/sign-up");
+const signedRequestIssuedAt = Number(signUpLocation.searchParams.get("ba_iat"));
+const signedRequestExpiresAt = Number(signUpLocation.searchParams.get("exp"));
+assert.equal(
+  signedRequestExpiresAt - Math.floor(signedRequestIssuedAt / 1_000),
+  10 * 60,
+);
 const oauthQuery = signUpLocation.search.slice(1);
 
 const signUp = await request(`${origin}/api/auth/sign-up/email`, {

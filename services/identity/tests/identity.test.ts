@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createIdentityApp } from "../src/app.js";
+import { authorizationCodeLifetimeSeconds } from "../src/auth.js";
+
+test("authorization codes stay short-lived while allowing account completion", () => {
+  assert.equal(authorizationCodeLifetimeSeconds, 10 * 60);
+});
 
 test("identity publishes its bounded capability", async () => {
   const app = createIdentityApp({
@@ -106,6 +111,8 @@ test("account client script performs validated sign-up and OAuth continuation", 
   assert.match(script, /\/api\/auth\/sign-up\/email/);
   assert.match(script, /\/api\/auth\/oauth2\/continue/);
   assert.match(script, /created: true/);
+  assert.match(script, /invalid_signature/);
+  assert.match(script, /Esta ventana segura expiró/);
 });
 
 test("consent page loads a same-origin script that submits the decision", async () => {

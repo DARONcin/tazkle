@@ -37,7 +37,8 @@ Swift conserva el access token en memoria y el refresh token en Keychain.
 
 - Firma asimétrica ES256 para compatibilidad con el allowlist de Gateway.
 - Access token e ID token: 15 minutos.
-- Código de autorización: 5 minutos.
+- Solicitud firmada y código de autorización: 10 minutos; continúa siendo
+  de un solo uso y queda dentro del máximo recomendado para OAuth.
 - Refresh token: 30 días y revocable.
 - Claves JWKS almacenadas en el esquema de identidad, con rotación y gracia de
   30 días.
