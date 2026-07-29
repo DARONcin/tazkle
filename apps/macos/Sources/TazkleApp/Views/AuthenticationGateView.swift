@@ -181,6 +181,23 @@ struct AuthenticationGateView: View {
                     "Abre el proveedor de identidad en el navegador seguro de macOS."
                 )
 
+                if authentication.state == .authorizing {
+                    Button {
+                        authentication.returnToSignIn()
+                    } label: {
+                        Label(
+                            "Cancelar y volver a intentarlo",
+                            systemImage: "arrow.counterclockwise"
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, TazkleSpacing.small)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityHint(
+                        "Cierra el acceso actual y habilita nuevamente el correo."
+                    )
+                }
+
                 Button {
                     authentication.continueLocally()
                 } label: {
@@ -189,9 +206,9 @@ struct AuthenticationGateView: View {
                         .padding(.vertical, TazkleSpacing.small)
                 }
                 .buttonStyle(.bordered)
-                .disabled(isBusy)
+                .disabled(authentication.state == .restoring)
                 .accessibilityHint(
-                    "Abre los proyectos locales sin sincronización ni colaboración."
+                    "Cancela cualquier acceso pendiente y abre los proyectos locales sin sincronización ni colaboración."
                 )
             }
 
@@ -251,7 +268,7 @@ struct AuthenticationGateView: View {
         case .authorizing:
             AccessNotice(
                 title: "Completa el acceso en el navegador",
-                detail: "Regresa a Tazkle cuando el proveedor confirme tu identidad.",
+                detail: "Ahí puedes iniciar sesión o crear una cuenta. Si cerraste la ventana, cancela este intento para comenzar otro.",
                 systemImage: "safari",
                 color: TazkleColors.assistantProposal
             )
@@ -263,14 +280,14 @@ struct AuthenticationGateView: View {
     private var accessSubtitle: String {
         authentication.configuration == nil
             ? "Conecta tu identidad para colaborar o entra en modo local."
-            : "Inicia sesión para sincronizar proyectos y colaborar con tu equipo."
+            : "Inicia sesión o crea una cuenta para sincronizar proyectos y colaborar con tu equipo."
     }
 
     private var primaryActionTitle: String {
         switch authentication.state {
         case .authorizing: "Esperando al navegador…"
         case .restoring: "Restaurando sesión…"
-        default: "Continuar con correo"
+        default: "Iniciar sesión o crear cuenta"
         }
     }
 

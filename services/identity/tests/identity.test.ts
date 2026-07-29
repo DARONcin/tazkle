@@ -61,6 +61,23 @@ test("sign-in page exposes only configured social providers", async () => {
   assert.match(body, /oauth_query: oauthQuery/);
 });
 
+test("sign-up page keeps browser validation and an atomic live status", async () => {
+  const app = createIdentityApp({
+    auth: {
+      handler: async () => new Response(null, { status: 204 }),
+    },
+  });
+
+  const response = await app.request("/sign-up?client_id=tazkle-macos");
+  const body = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(body, /<form id="account-form">/);
+  assert.doesNotMatch(body, /<form id="account-form" novalidate>/);
+  assert.match(body, /form\.reportValidity\(\)/);
+  assert.match(body, /aria-live="polite" aria-atomic="true"/);
+});
+
 test("auth endpoints are delegated without exposing unrelated routes", async () => {
   const delegatedPaths: string[] = [];
   const app = createIdentityApp({

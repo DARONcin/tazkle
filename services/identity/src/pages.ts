@@ -135,6 +135,7 @@ for (const button of document.querySelectorAll("[data-social-provider]")) {
 }
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!form.reportValidity()) return;
   setBusy(true, "Validando de forma segura…");
   const data = new FormData(form);
   const body = {
@@ -187,7 +188,7 @@ ${sharedScriptHelpers()}
             <h1 id="page-title">${title}</h1>
             <p class="lead">Conecta proyectos, colaboración y sincronización con una cuenta segura.</p>
             ${socialProviderButtons(socialProviders)}
-            <form id="account-form" novalidate>
+            <form id="account-form">
               ${
                 isSignUp
                   ? `<label for="name">Nombre</label>
@@ -203,7 +204,7 @@ ${sharedScriptHelpers()}
                   ? `<p class="field-help">Usa al menos 12 caracteres. Tazkle nunca recibe esta contraseña en la app de macOS.</p>`
                   : ""
               }
-              <p id="status" class="status" role="status" aria-live="polite" hidden></p>
+              <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true" hidden></p>
               <button class="button primary" type="submit">${submitText}</button>
             </form>
             <a class="alternate" href="${alternatePath}?${escapeAttribute(normalizedQuery(search))}">${alternateText}</a>
