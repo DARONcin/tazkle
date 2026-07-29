@@ -141,13 +141,12 @@ Sidebar de navegación | Contenido principal | Inspector contextual
 ## Entrada e identidad
 
 - Antes del espacio de trabajo, Tazkle presenta una puerta de entrada nativa con
-  correo como campo persistente del formulario, una acción dominante
-  `Continuar con correo` y una alternativa secundaria para continuar sólo en
-  esta Mac.
-- El acceso remoto abre el proveedor en el navegador mediante la sesión de
-  autenticación de macOS. El correo se usa como `login_hint`; Tazkle no lo
-  persiste, no presenta campos de contraseña y no simula una autenticación
-  propia.
+  una acción dominante `Crear cuenta`, una acción secundaria `Iniciar sesión`
+  y una alternativa para continuar sólo en esta Mac.
+- El acceso remoto abre directamente el registro o el inicio de sesión
+  correspondiente mediante la sesión de autenticación de macOS. Nombre, correo
+  y contraseña se capturan una sola vez en la pantalla alojada por Identity;
+  Tazkle no duplica esos campos ni simula una autenticación propia.
 - El modo local conserva el trabajo en SQLite, pero comunica de forma persistente
   que sincronización y colaboración no están habilitadas.
 - Una credencial conocida sin conectividad abre el proyecto en estado
@@ -155,9 +154,9 @@ Sidebar de navegación | Contenido principal | Inspector contextual
 - La entrada define estados de configuración pendiente, restauración, espera del
   navegador, cancelación y error recuperable. El texto y el icono acompañan
   cualquier uso de color o progreso.
-- Un correo inválido conserva el valor, muestra un error ligado al campo y
-  devuelve el foco para corregirlo. `Return` ejecuta la misma acción que el
-  botón principal.
+- Los errores de los datos de cuenta se muestran junto al formulario alojado,
+  preservan los valores recuperables y permiten corregirlos sin reiniciar la
+  autorización. `Return` envía el formulario correspondiente.
 - Perfil y configuración → Seguridad muestra el estado efectivo de esta Mac y
   permite cerrar la sesión o volver a conectar una cuenta.
 

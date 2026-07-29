@@ -77,7 +77,15 @@ public final class AuthenticationController: ObservableObject {
         }
     }
 
-    public func signIn(email: EmailLoginHint) async {
+    public func signIn() async {
+        await authorize(intent: .signIn)
+    }
+
+    public func signUp() async {
+        await authorize(intent: .signUp)
+    }
+
+    private func authorize(intent: AccountAuthorizationIntent) async {
         guard let client else {
             state = configuration == nil
                 ? .configurationRequired
@@ -87,7 +95,7 @@ public final class AuthenticationController: ObservableObject {
 
         state = .authorizing
         do {
-            let request = try await client.makeAuthorizationRequest(loginHint: email)
+            let request = try await client.makeAuthorizationRequest(intent: intent)
             let callbackURL = try await webAuthenticator.authenticate(using: request)
             let tokenSet = try await client.exchange(
                 callbackURL: callbackURL,

@@ -9,13 +9,6 @@ struct AuthenticationGateView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("appearancePreference") private var appearance =
         AppearancePreference.automatic.rawValue
-    @State private var emailAddress = ""
-    @State private var emailValidationAttempted = false
-    @FocusState private var focusedField: Field?
-
-    private enum Field {
-        case email
-    }
 
     private var highContrast: Bool {
         AppearancePreference(rawValue: appearance)?.usesHighContrastTokens == true
@@ -89,66 +82,10 @@ struct AuthenticationGateView: View {
 
             stateNotice
 
-            VStack(alignment: .leading, spacing: TazkleSpacing.small) {
-                Text("Correo electrónico")
-                    .font(.callout.weight(.medium))
-
-                HStack(spacing: TazkleSpacing.small) {
-                    Image(systemName: "envelope")
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-                    TextField("nombre@empresa.com", text: $emailAddress)
-                        .textFieldStyle(.plain)
-                        .textContentType(.emailAddress)
-                        .autocorrectionDisabled()
-                        .focused($focusedField, equals: .email)
-                        .onSubmit(beginEmailSignIn)
-                        .accessibilityLabel("Correo electrónico")
-                }
-                .padding(.horizontal, TazkleSpacing.medium)
-                .padding(.vertical, TazkleSpacing.medium)
-                .background(
-                    TazkleColors.elevated(
-                        for: colorScheme,
-                        highContrast: highContrast
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: TazkleRadius.control))
-                .overlay {
-                    RoundedRectangle(cornerRadius: TazkleRadius.control)
-                        .stroke(
-                            emailHasError
-                                ? TazkleColors.warning
-                                : TazkleColors.separator(
-                                    for: colorScheme,
-                                    highContrast: highContrast
-                                ),
-                            lineWidth: emailHasError ? 2 : 1
-                        )
-                }
-                .disabled(isBusy)
-
-                if emailHasError {
-                    Label(
-                        "Escribe un correo válido para continuar.",
-                        systemImage: "exclamationmark.circle"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(TazkleColors.warning)
-                    .accessibilityLabel(
-                        "Error en correo electrónico. Escribe un correo válido para continuar."
-                    )
-                } else {
-                    Text("No se guarda en preferencias ni en SQLite.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
             VStack(spacing: TazkleSpacing.medium) {
-                Button(action: beginEmailSignIn) {
+                Button(action: beginSignUp) {
                     HStack {
-                        Image(systemName: "envelope.fill")
+                        Image(systemName: "person.badge.plus")
                             .accessibilityHidden(true)
                         Text(primaryActionTitle)
                         Spacer()
@@ -178,7 +115,18 @@ struct AuthenticationGateView: View {
                 .disabled(authentication.configuration == nil || isBusy)
                 .keyboardShortcut(.defaultAction)
                 .accessibilityHint(
-                    "Abre el proveedor de identidad en el navegador seguro de macOS."
+                    "Abre directamente el registro seguro de Tazkle en el navegador de macOS."
+                )
+
+                Button(action: beginSignIn) {
+                    Label("Iniciar sesión", systemImage: "person.crop.circle")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, TazkleSpacing.small)
+                }
+                .buttonStyle(.bordered)
+                .disabled(authentication.configuration == nil || isBusy)
+                .accessibilityHint(
+                    "Abre el acceso para una cuenta existente en el navegador seguro de macOS."
                 )
 
                 if authentication.state == .authorizing {
@@ -194,7 +142,7 @@ struct AuthenticationGateView: View {
                     }
                     .buttonStyle(.bordered)
                     .accessibilityHint(
-                        "Cierra el acceso actual y habilita nuevamente el correo."
+                        "Cierra el acceso actual y habilita nuevamente las opciones de cuenta."
                     )
                 }
 
@@ -213,7 +161,7 @@ struct AuthenticationGateView: View {
             }
 
             Label(
-                "Tu contraseña permanece en el proveedor de identidad",
+                "Tus datos se escriben una sola vez en el proveedor de identidad",
                 systemImage: "lock.shield"
             )
             .font(.caption)
@@ -268,7 +216,7 @@ struct AuthenticationGateView: View {
         case .authorizing:
             AccessNotice(
                 title: "Completa el acceso en el navegador",
-                detail: "Ahí puedes iniciar sesión o crear una cuenta. Si cerraste la ventana, cancela este intento para comenzar otro.",
+                detail: "Escribe ahí tus datos una sola vez. Si cerraste la ventana, cancela este intento para comenzar otro.",
                 systemImage: "safari",
                 color: TazkleColors.assistantProposal
             )
@@ -280,14 +228,14 @@ struct AuthenticationGateView: View {
     private var accessSubtitle: String {
         authentication.configuration == nil
             ? "Conecta tu identidad para colaborar o entra en modo local."
-            : "Inicia sesión o crea una cuenta para sincronizar proyectos y colaborar con tu equipo."
+            : "Elige una opción. Los datos de tu cuenta se capturan únicamente en la ventana segura."
     }
 
     private var primaryActionTitle: String {
         switch authentication.state {
         case .authorizing: "Esperando al navegador…"
         case .restoring: "Restaurando sesión…"
-        default: "Iniciar sesión o crear cuenta"
+        default: "Crear cuenta"
         }
     }
 
@@ -295,23 +243,15 @@ struct AuthenticationGateView: View {
         authentication.state == .authorizing || authentication.state == .restoring
     }
 
-    private var emailHint: EmailLoginHint? {
-        EmailLoginHint(emailAddress)
-    }
-
-    private var emailHasError: Bool {
-        emailValidationAttempted && emailHint == nil
-    }
-
-    private func beginEmailSignIn() {
-        emailValidationAttempted = true
-        guard let emailHint else {
-            focusedField = .email
-            return
-        }
-        focusedField = nil
+    private func beginSignUp() {
         Task {
-            await authentication.signIn(email: emailHint)
+            await authentication.signUp()
+        }
+    }
+
+    private func beginSignIn() {
+        Task {
+            await authentication.signIn()
         }
     }
 }

@@ -262,11 +262,11 @@ public struct AuthenticatedUser: Equatable, Sendable {
 
     private static func optionalEmail(_ value: String?) -> String? {
         guard let value else { return nil }
-        return EmailLoginHint(value)?.value
+        return SafeEmailAddress(value)?.value
     }
 }
 
-public struct EmailLoginHint: Equatable, Sendable {
+public struct SafeEmailAddress: Equatable, Sendable {
     public let value: String
 
     public init?(_ rawValue: String) {
@@ -300,6 +300,11 @@ public struct EmailLoginHint: Equatable, Sendable {
 
         self.value = value
     }
+}
+
+enum AccountAuthorizationIntent: Equatable, Sendable {
+    case signIn
+    case signUp
 }
 
 public enum AuthenticationState: Equatable, Sendable {

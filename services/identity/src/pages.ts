@@ -98,10 +98,13 @@ function accountPage(
   const query = safeInlineJSON(normalizedQuery(search));
   const isSignUp = mode === "signup";
   const title = isSignUp ? "Crear cuenta" : "Entrar a Tazkle";
-  const alternatePath = isSignUp ? "/sign-in" : "/sign-up";
   const alternateText = isSignUp
     ? "Ya tengo una cuenta"
     : "Crear una cuenta";
+  const alternateURL = authorizationRestartURL(
+    search,
+    isSignUp ? "signin" : "signup",
+  );
   const submitText = isSignUp ? "Crear cuenta y continuar" : "Continuar";
   const script = `
 const oauthQuery = ${query};
@@ -157,6 +160,19 @@ form.addEventListener("submit", async (event) => {
     );
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(userMessage(payload));
+    if (mode === "signup") {
+      const continueResponse = await fetch("/api/auth/oauth2/continue", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Accept": "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ created: true, oauth_query: oauthQuery })
+      });
+      const continuePayload = await continueResponse.json().catch(() => ({}));
+      if (!continueResponse.ok) throw new Error(userMessage(continuePayload));
+      if (!continuePayload.url) throw new Error("No fue posible continuar con la autorización.");
+      window.location.assign(continuePayload.url);
+      return;
+    }
     if (!payload.url) throw new Error("No fue posible volver a Tazkle.");
     window.location.assign(payload.url);
   } catch (error) {
@@ -207,7 +223,7 @@ ${sharedScriptHelpers()}
               <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true" hidden></p>
               <button class="button primary" type="submit">${submitText}</button>
             </form>
-            <a class="alternate" href="${alternatePath}?${escapeAttribute(normalizedQuery(search))}">${alternateText}</a>
+            <a class="alternate" href="${escapeAttribute(alternateURL)}">${alternateText}</a>
           </section>
           <p class="privacy-note">El acceso ocurre en una ventana segura del sistema. Puedes seguir trabajando localmente sin conectar una cuenta.</p>
         </main>
@@ -350,6 +366,33 @@ function safeMessage(error) {
 
 function normalizedQuery(search: string): string {
   return search.startsWith("?") ? search.slice(1) : search;
+}
+
+function authorizationRestartURL(
+  search: string,
+  mode: "signin" | "signup",
+): string {
+  const source = new URLSearchParams(normalizedQuery(search));
+  const next = new URLSearchParams();
+  for (const name of [
+    "client_id",
+    "redirect_uri",
+    "response_type",
+    "scope",
+    "state",
+    "code_challenge",
+    "code_challenge_method",
+    "resource",
+  ]) {
+    const value = source.get(name);
+    if (value) {
+      next.set(name, value);
+    }
+  }
+  if (mode === "signup") {
+    next.set("prompt", "create");
+  }
+  return `/api/auth/oauth2/authorize?${next.toString()}`;
 }
 
 function safeInlineJSON(value: string): string {

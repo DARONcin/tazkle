@@ -50,6 +50,7 @@ authorizationURL.search = new URLSearchParams({
   code_challenge: challenge,
   code_challenge_method: "S256",
   resource,
+  prompt: "create",
 }).toString();
 
 const authorizationResponse = await request(authorizationURL, {
@@ -57,9 +58,9 @@ const authorizationResponse = await request(authorizationURL, {
   redirect: "manual",
 });
 assert.equal(authorizationResponse.status, 302);
-const signInLocation = requiredLocation(authorizationResponse);
-assert.equal(signInLocation.pathname, "/sign-in");
-const oauthQuery = signInLocation.search.slice(1);
+const signUpLocation = requiredLocation(authorizationResponse);
+assert.equal(signUpLocation.pathname, "/sign-up");
+const oauthQuery = signUpLocation.search.slice(1);
 
 const signUp = await request(`${origin}/api/auth/sign-up/email`, {
   method: "POST",
@@ -74,7 +75,16 @@ const signUp = await request(`${origin}/api/auth/sign-up/email`, {
 });
 const signUpPayload = await checkedJSON(signUp, 200);
 assert.equal(typeof signUpPayload.url, "string");
-const consentLocation = new URL(signUpPayload.url, origin);
+const continueSignUp = await request(`${origin}/api/auth/oauth2/continue`, {
+  method: "POST",
+  headers: jsonHeaders(),
+  body: JSON.stringify({
+    created: true,
+    oauth_query: oauthQuery,
+  }),
+});
+const continuePayload = await checkedJSON(continueSignUp, 200);
+const consentLocation = new URL(continuePayload.url, origin);
 assert.equal(consentLocation.pathname, "/consent");
 
 const consent = await request(`${origin}/api/auth/oauth2/consent`, {

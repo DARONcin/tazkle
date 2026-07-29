@@ -25,10 +25,10 @@ El cliente registrado es público y no tiene secreto:
 - scopes `openid profile email offline_access`;
 - audiencia local `tazkle-local`.
 
-El flujo se abre con `ASWebAuthenticationSession`. El correo puede viajar como
-`login_hint`; nombre, correo y contraseña se escriben únicamente en la pantalla
-alojada. Swift conserva el access token en memoria y el refresh token en
-Keychain.
+El flujo se abre con `ASWebAuthenticationSession`. `Crear cuenta` añade
+`prompt=create`, mientras que `Iniciar sesión` usa la autorización normal.
+Nombre, correo y contraseña se escriben una sola vez en la pantalla alojada.
+Swift conserva el access token en memoria y el refresh token en Keychain.
 
 ## Tokens y claves
 

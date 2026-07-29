@@ -61,16 +61,16 @@ func producesTheRFC7636S256Challenge() {
 }
 
 @Test
-func validatesEmailLoginHintsWithoutPersistingOrInterpretingThem() {
-    #expect(EmailLoginHint("persona@ejemplo.com")?.value == "persona@ejemplo.com")
-    #expect(EmailLoginHint("  persona@ejemplo.com  ")?.value == "persona@ejemplo.com")
-    #expect(EmailLoginHint("sin-arroba") == nil)
-    #expect(EmailLoginHint("persona@@ejemplo.com") == nil)
-    #expect(EmailLoginHint("persona@ejemplo.com\r\nX-Test: injected") == nil)
+func validatesProviderEmailClaimsWithoutPersistingOrInterpretingThem() {
+    #expect(SafeEmailAddress("persona@ejemplo.com")?.value == "persona@ejemplo.com")
+    #expect(SafeEmailAddress("  persona@ejemplo.com  ")?.value == "persona@ejemplo.com")
+    #expect(SafeEmailAddress("sin-arroba") == nil)
+    #expect(SafeEmailAddress("persona@@ejemplo.com") == nil)
+    #expect(SafeEmailAddress("persona@ejemplo.com\r\nX-Test: injected") == nil)
 }
 
 @Test
-func addsTheValidatedEmailAsAnOIDCLoginHint() throws {
+func distinguishesSignInFromDirectAccountCreation() throws {
     let configuration = try OIDCConfiguration(
         issuer: URL(string: "https://identity.example.com")!,
         clientID: "tazkle-macos",
@@ -84,20 +84,31 @@ func addsTheValidatedEmailAsAnOIDCLoginHint() throws {
         userInfoEndpoint: URL(string: "https://identity.example.com/userinfo")!,
         codeChallengeMethodsSupported: ["S256"]
     )
-    let request = try OIDCClient.authorizationRequest(
+    let signInRequest = try OIDCClient.authorizationRequest(
         metadata: metadata,
         configuration: configuration,
         state: "state",
         codeVerifier: "verifier",
-        loginHint: EmailLoginHint("persona+proyecto@ejemplo.com")
+        intent: .signIn
     )
-    let queryItems = try #require(
-        URLComponents(url: request.url, resolvingAgainstBaseURL: false)?.queryItems
+    let signUpRequest = try OIDCClient.authorizationRequest(
+        metadata: metadata,
+        configuration: configuration,
+        state: "state",
+        codeVerifier: "verifier",
+        intent: .signUp
     )
-    let loginHints = queryItems.filter { $0.name == "login_hint" }
+    let signInQuery = try #require(
+        URLComponents(url: signInRequest.url, resolvingAgainstBaseURL: false)?.queryItems
+    )
+    let signUpQuery = try #require(
+        URLComponents(url: signUpRequest.url, resolvingAgainstBaseURL: false)?.queryItems
+    )
 
-    #expect(loginHints.count == 1)
-    #expect(loginHints.first?.value == "persona+proyecto@ejemplo.com")
+    #expect(signInQuery.first { $0.name == "prompt" } == nil)
+    #expect(signInQuery.first { $0.name == "login_hint" } == nil)
+    #expect(signUpQuery.first { $0.name == "prompt" }?.value == "create")
+    #expect(signUpQuery.first { $0.name == "login_hint" } == nil)
 }
 
 @Test

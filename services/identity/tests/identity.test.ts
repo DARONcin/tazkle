@@ -76,6 +76,39 @@ test("sign-up page keeps browser validation and an atomic live status", async ()
   assert.doesNotMatch(body, /<form id="account-form" novalidate>/);
   assert.match(body, /form\.reportValidity\(\)/);
   assert.match(body, /aria-live="polite" aria-atomic="true"/);
+  assert.match(body, /\/api\/auth\/oauth2\/continue/);
+  assert.match(body, /created: true/);
+});
+
+test("account mode links restart authorization without reusing signed state", async () => {
+  const app = createIdentityApp({
+    auth: {
+      handler: async () => new Response(null, { status: 204 }),
+    },
+  });
+  const common =
+    "client_id=tazkle-macos&redirect_uri=app.tazkle.desktop%3A%2Foauth%2Fcallback" +
+    "&response_type=code&scope=openid+email&state=state" +
+    "&code_challenge=challenge&code_challenge_method=S256";
+
+  const signUpBody = await (
+    await app.request(`/sign-up?${common}&prompt=create&sig=old-signature`)
+  ).text();
+  const signInBody = await (
+    await app.request(`/sign-in?${common}&sig=old-signature`)
+  ).text();
+  const signUpAlternate = signUpBody.match(
+    /<a class="alternate" href="([^"]+)"/,
+  )?.[1];
+  const signInAlternate = signInBody.match(
+    /<a class="alternate" href="([^"]+)"/,
+  )?.[1];
+
+  assert.ok(signUpAlternate?.startsWith("/api/auth/oauth2/authorize?"));
+  assert.doesNotMatch(signUpAlternate, /old-signature|prompt=create/);
+  assert.ok(signInAlternate?.startsWith("/api/auth/oauth2/authorize?"));
+  assert.match(signInAlternate, /prompt=create/);
+  assert.doesNotMatch(signInAlternate, /old-signature/);
 });
 
 test("auth endpoints are delegated without exposing unrelated routes", async () => {

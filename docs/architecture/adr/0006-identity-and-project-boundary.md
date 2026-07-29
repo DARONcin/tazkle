@@ -66,7 +66,8 @@ El cliente nativo ya aplica el contrato independiente de proveedor:
 - Authorization Code mediante `ASWebAuthenticationSession`;
 - PKCE S256, `state` aleatorio y callback fijo
   `app.tazkle.desktop:/oauth/callback`;
-- correo validado y enviado sólo como `login_hint`, sin persistencia local;
+- selección explícita entre inicio de sesión y registro directo mediante
+  parámetros OIDC allowlisted, sin capturar datos de cuenta en la vista nativa;
 - descubrimiento OIDC sobre HTTPS con coincidencia exacta de emisor;
 - validación de endpoints, límites de respuesta y respuesta Bearer;
 - access token únicamente en memoria;
@@ -76,7 +77,8 @@ El cliente nativo ya aplica el contrato independiente de proveedor:
 - cierre local y revocación remota cuando el proveedor publica endpoint;
 - estados separados para sesión remota, sin conexión y trabajo sólo local.
 
-La app recopila únicamente el correo como paso inicial; la contraseña se
-introduce en la pantalla alojada por Identity, nunca en una vista Swift. El modo local permite
-trabajar con SQLite, pero no fabrica identidad, membresía ni autorización
-remota. Better Auth implementa actualmente ese contrato; consulta ADR-0007.
+La app no recopila datos de cuenta: nombre, correo y contraseña se introducen en
+la pantalla alojada por Identity, nunca en una vista Swift. El modo local
+permite trabajar con SQLite, pero no fabrica identidad, membresía ni
+autorización remota. Better Auth implementa actualmente ese contrato; consulta
+ADR-0007.

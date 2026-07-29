@@ -17,10 +17,10 @@ El cliente implementa Authorization Code con PKCE S256 mediante
 el proveedor OIDC; Tazkle conserva el refresh token únicamente en Keychain y
 mantiene el access token corto en memoria.
 
-La puerta de entrada solicita el correo como primer paso y lo envía únicamente
-al proveedor como `login_hint`. No lo conserva en `UserDefaults`, SQLite ni
-Keychain. El proveedor decide si continúa con contraseña, código temporal,
-enlace o MFA.
+La puerta de entrada no solicita datos de cuenta. Permite elegir entre
+`Crear cuenta`, que abre directamente el registro con `prompt=create`, e
+`Iniciar sesión`. Nombre, correo y contraseña se capturan una sola vez en
+Identity y no se conservan en `UserDefaults`, SQLite ni Keychain.
 
 La página alojada por Identity permite correo y contraseña y, cuando existen
 credenciales de servidor, acceso con Google o Microsoft. El flujo social

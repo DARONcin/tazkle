@@ -67,8 +67,9 @@ flowchart LR
   considerarse operaciones reales.
 - Las credenciales de identidad se almacenarán en Keychain y las claves de
   proveedores permanecerán exclusivamente en el almacén de secretos del servicio.
-- El correo de entrada se valida, se transmite al proveedor sólo como
-  `login_hint` y no se persiste en preferencias, SQLite, Keychain ni logs.
+- La puerta nativa no solicita datos de cuenta. Nombre, correo y contraseña se
+  capturan exclusivamente en Identity; la contraseña no vuelve al cliente y
+  ningún dato del formulario se persiste en preferencias, SQLite ni logs.
 - El perfil visible se obtiene de `userinfo` descubierto por OIDC. Los claims se
   limitan, validan y se mantienen en memoria; una respuesta ausente o inválida
   nunca se sustituye por una persona ficticia.
@@ -102,10 +103,11 @@ flowchart LR
 El runtime y el contrato OIDC genérico ya fueron seleccionados. El cliente
 macOS implementa navegador externo, PKCE S256, validación de `state`, callback
 registrado, renovación en Keychain y revocación cuando el proveedor la expone.
-No contiene client secret ni formulario de contraseña. El único dato de entrada
-es el correo, usado para orientar el acceso alojado por el proveedor. La
-identidad de interfaz procede de `userinfo`, se valida antes de presentarse y no
-se persiste como una fuente local de autoridad.
+No contiene client secret ni formulario de cuenta. Las acciones nativas eligen
+entre inicio de sesión y creación mediante parámetros OIDC allowlisted; los
+datos se capturan una sola vez en Identity. La identidad de interfaz procede de
+`userinfo`, se valida antes de presentarse y no se persiste como una fuente
+local de autoridad.
 
 Better Auth ya opera localmente detrás de Gateway y se comprobó discovery OIDC,
 ES256, PKCE y el cliente nativo registrado. Antes de producción siguen
