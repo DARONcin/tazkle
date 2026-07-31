@@ -30,6 +30,7 @@ export function createIdentityAuth(
       minPasswordLength: 12,
       maxPasswordLength: 128,
       requireEmailVerification: true,
+      revokeSessionsOnPasswordReset: true,
     },
     emailVerification: {
       sendOnSignUp: false,

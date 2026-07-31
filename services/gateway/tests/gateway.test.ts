@@ -474,3 +474,67 @@ test("gateway rejects a graph replace with a self-relation before Project Core",
   assert.equal(response.status, 400);
   assert.equal(internalCalls, 0);
 });
+
+test("gateway forwards a members list to the internal endpoint", async () => {
+  let target = "";
+  let forwardedAuthorization = "";
+  const membersPayload = {
+    members: [
+      {
+        organizationId: "550e8400-e29b-41d4-a716-446655440005",
+        userId: "550e8400-e29b-41d4-a716-446655440006",
+        displayName: "Ana",
+        role: "organization-admin",
+        status: "active",
+        createdAt: "2026-07-28T18:00:00.000Z",
+      },
+    ],
+  };
+  const app = createGatewayApp({
+    urls,
+    accessTokens,
+    internalActors,
+    fetchImplementation: async (input, init) => {
+      target = input.toString();
+      const headers = new Headers(init?.headers);
+      forwardedAuthorization = headers.get("Authorization") ?? "";
+      return Response.json(membersPayload);
+    },
+  });
+
+  const response = await app.request("/v1/members", {
+    headers: {
+      Accept: "application/json",
+      Authorization: "Bearer external.payload.signature",
+    },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(target, "http://project-core.test/internal/v1/members");
+  assert.equal(forwardedAuthorization, "Bearer internal.payload.signature");
+  assert.deepEqual(await response.json(), membersPayload);
+});
+
+test("gateway authenticates before listing members", async () => {
+  let internalCalls = 0;
+  const app = createGatewayApp({
+    urls,
+    accessTokens: {
+      verify: async () => {
+        throw new AuthenticationError();
+      },
+    },
+    internalActors,
+    fetchImplementation: async () => {
+      internalCalls += 1;
+      throw new Error("must not be called");
+    },
+  });
+
+  const response = await app.request("/v1/members", {
+    headers: { Accept: "application/json" },
+  });
+
+  assert.equal(response.status, 401);
+  assert.equal(internalCalls, 0);
+});

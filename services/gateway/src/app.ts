@@ -4,6 +4,7 @@ import {
   errorEnvelopeSchema,
   HTTP_HEADERS,
   idempotencyKeySchema,
+  membersListResponseSchema,
   platformCapabilitiesSchema,
   projectGraphResponseSchema,
   projectListResponseSchema,
@@ -266,6 +267,28 @@ export function createGatewayApp({
         fetchImplementation,
       );
       return proxyProjectResponse(context, response, projectGraphResponseSchema);
+    } catch (error) {
+      return gatewayOperationError(context, error);
+    }
+  });
+
+  app.get("/v1/members", async (context) => {
+    try {
+      requireJSONAccept(context.req.header("Accept"));
+      const internalToken = await authenticateAndSign(
+        context,
+        accessTokens,
+        internalActors,
+      );
+      const response = await fetchInternal(
+        new URL("/internal/v1/members", urls.projectCore),
+        {
+          method: "GET",
+          headers: internalHeaders(internalToken),
+        },
+        fetchImplementation,
+      );
+      return proxyProjectResponse(context, response, membersListResponseSchema);
     } catch (error) {
       return gatewayOperationError(context, error);
     }

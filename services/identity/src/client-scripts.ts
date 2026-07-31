@@ -12,6 +12,13 @@ const otpInstructions = document.querySelector("#otp-instructions");
 const resendButton = document.querySelector("#resend-code");
 const finishEnrollmentButton = document.querySelector("#finish-enrollment");
 const recoveryCodesList = document.querySelector("#recovery-codes");
+const forgotPasswordLink = document.querySelector("#forgot-password-link");
+const forgotPasswordForm = document.querySelector("#forgot-password-form");
+const cancelForgotPasswordButton = document.querySelector("#cancel-forgot-password");
+const resetPasswordForm = document.querySelector("#reset-password-form");
+const resetPasswordInstructions = document.querySelector("#reset-password-instructions");
+const resetOTPInput = document.querySelector("#reset-otp");
+const resendResetCodeButton = document.querySelector("#resend-reset-code");
 const mode = form?.dataset.mode;
 const oauthQuery = String(
   form?.querySelector('input[name="oauth_query"]')?.value || ""
@@ -19,8 +26,10 @@ const oauthQuery = String(
 let challengeMode = null;
 let pendingEmail = "";
 let pendingPassword = "";
+let pendingResetEmail = "";
 let recoveryCodes = [];
 let lastCodeSentAt = 0;
+let lastResetCodeSentAt = 0;
 
 for (const button of document.querySelectorAll("[data-social-provider]")) {
   button.addEventListener("click", async () => {
@@ -214,6 +223,128 @@ finishEnrollmentButton?.addEventListener("click", async () => {
   }
 });
 
+forgotPasswordLink?.addEventListener("click", () => {
+  showForgotPassword();
+});
+
+cancelForgotPasswordButton?.addEventListener("click", () => {
+  showSignInForm();
+});
+
+forgotPasswordForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!forgotPasswordForm.reportValidity()) return;
+  const email = String(
+    new FormData(forgotPasswordForm).get("forgot-email") || ""
+  ).trim();
+  pendingResetEmail = email;
+  setBusy(true, "Solicitando un código…");
+  try {
+    const response = await jsonRequest(
+      "/api/auth/email-otp/request-password-reset",
+      { email }
+    );
+    if (!response.ok) throw new Error(userMessage(response.payload));
+    lastResetCodeSentAt = Date.now();
+    showResetPassword();
+  } catch (error) {
+    showError(error);
+  }
+});
+
+resetPasswordForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!resetPasswordForm.reportValidity()) return;
+  const data = new FormData(resetPasswordForm);
+  const otp = String(data.get("otp") || "").trim();
+  const password = String(data.get("password") || "");
+  setBusy(true, "Restableciendo tu contraseña…");
+  try {
+    const response = await jsonRequest("/api/auth/email-otp/reset-password", {
+      email: pendingResetEmail,
+      otp,
+      password
+    });
+    if (!response.ok) throw new Error(userMessage(response.payload));
+    pendingResetEmail = "";
+    showSignInForm("Contraseña actualizada. Inicia sesión con tu nueva contraseña.");
+  } catch (error) {
+    showError(error);
+    resetOTPInput?.focus();
+  }
+});
+
+resendResetCodeButton?.addEventListener("click", async () => {
+  const remaining = 60 - Math.floor((Date.now() - lastResetCodeSentAt) / 1000);
+  if (lastResetCodeSentAt > 0 && remaining > 0) {
+    showStatus("Podrás solicitar otro código en " + remaining + " segundos.");
+    return;
+  }
+
+  setBusy(true, "Solicitando un código nuevo…");
+  try {
+    const response = await jsonRequest(
+      "/api/auth/email-otp/request-password-reset",
+      { email: pendingResetEmail }
+    );
+    if (!response.ok) throw new Error(userMessage(response.payload));
+    lastResetCodeSentAt = Date.now();
+    setBusy(false);
+    showStatus("Solicitamos un código nuevo. Usa únicamente el mensaje más reciente.");
+    resetOTPInput?.focus();
+  } catch (error) {
+    showError(error);
+  }
+});
+
+function showForgotPassword() {
+  form.hidden = true;
+  if (socialOptions) socialOptions.hidden = true;
+  if (socialDivider) socialDivider.hidden = true;
+  otpForm.hidden = true;
+  recoveryStep.hidden = true;
+  resetPasswordForm.hidden = true;
+  forgotPasswordForm.hidden = false;
+  if (alternate) alternate.hidden = true;
+  if (title) title.textContent = "Recuperar contraseña";
+  const forgotEmailInput = document.querySelector("#forgot-email");
+  if (forgotEmailInput && !forgotEmailInput.value) {
+    forgotEmailInput.value = document.querySelector("#email")?.value || "";
+  }
+  setBusy(false);
+  showStatus("Escribe el correo de tu cuenta.");
+  forgotEmailInput?.focus();
+}
+
+function showResetPassword() {
+  forgotPasswordForm.hidden = true;
+  resetPasswordForm.hidden = false;
+  if (title) title.textContent = "Restablecer contraseña";
+  resetPasswordInstructions.textContent =
+    "Enviamos un código a " + maskedEmail(pendingResetEmail) + ". Puede tardar unos segundos.";
+  setBusy(false);
+  showStatus("Revisa tu bandeja de entrada y correo no deseado.");
+  resetOTPInput?.focus();
+}
+
+function showSignInForm(message) {
+  forgotPasswordForm.hidden = true;
+  resetPasswordForm.hidden = true;
+  otpForm.hidden = true;
+  recoveryStep.hidden = true;
+  form.hidden = false;
+  if (socialOptions) socialOptions.hidden = false;
+  if (socialDivider) socialDivider.hidden = false;
+  if (alternate) alternate.hidden = false;
+  if (title) title.textContent = "Entrar a Tazkle";
+  setBusy(false);
+  if (message) {
+    showStatus(message);
+  } else if (status) {
+    status.hidden = true;
+  }
+}
+
 async function enableTwoFactor() {
   if (!pendingPassword) {
     throw new Error("Vuelve a iniciar sesión para activar la protección en dos pasos.");
@@ -392,6 +523,12 @@ function userMessage(payload) {
   }
   if (code === "PASSWORD_TOO_SHORT") {
     return "La contraseña debe tener al menos 12 caracteres.";
+  }
+  if (code === "PASSWORD_TOO_LONG") {
+    return "La contraseña no puede superar 128 caracteres.";
+  }
+  if (code === "USER_NOT_FOUND") {
+    return "No fue posible restablecer la contraseña. Solicita un código nuevo.";
   }
   if (code === "INVALID_PASSWORD") {
     return "La contraseña no coincide con la cuenta existente.";

@@ -1,4 +1,5 @@
 import Foundation
+import TazkleAuthentication
 import TazkleDomain
 import TazklePersistence
 
@@ -188,6 +189,14 @@ enum WorkspaceContentState: Equatable {
     case project
 }
 
+enum TeamLoadState: Equatable {
+    case idle
+    case loading
+    case loaded
+    case offline
+    case error(String)
+}
+
 @MainActor
 final class AppState: ObservableObject {
     @Published var graph: ProjectGraph
@@ -224,6 +233,8 @@ final class AppState: ObservableObject {
     @Published var saveState: LocalSaveState = .saved
     @Published private(set) var workspaceContentState: WorkspaceContentState = .loading
     @Published var isPresentingProductTour = false
+    @Published private(set) var teamMembers: [OrganizationMember] = []
+    @Published private(set) var teamLoadState: TeamLoadState = .idle
 
     private var store: SQLiteProjectStore?
     private(set) var activeWorkspaceAccountID: String?
@@ -299,6 +310,31 @@ final class AppState: ObservableObject {
         } catch {
             lastError = "La cuenta se eliminó, pero no fue posible borrar su copia local. \(error.localizedDescription)"
             throw error
+        }
+    }
+
+    func loadTeamMembers(using authentication: AuthenticationController) async {
+        guard let issuer = authentication.configuration?.issuer,
+              let baseURL = URL.platformGatewayBaseURL(fromIssuer: issuer)
+        else {
+            teamLoadState = .error("No hay una sesión configurada para cargar el equipo.")
+            return
+        }
+
+        teamLoadState = .loading
+        do {
+            let accessToken = try await authentication.validAccessToken()
+            let client = PlatformAPIClient(baseURL: baseURL)
+            teamMembers = try await client.fetchMembers(accessToken: accessToken)
+            teamLoadState = .loaded
+        } catch AuthenticationFailure.providerUnavailable {
+            teamLoadState = .offline
+        } catch is AuthenticationFailure {
+            teamLoadState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
+        } catch PlatformAPIError.unauthorized {
+            teamLoadState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
+        } catch {
+            teamLoadState = .error("No fue posible cargar el equipo. Inténtalo nuevamente.")
         }
     }
 

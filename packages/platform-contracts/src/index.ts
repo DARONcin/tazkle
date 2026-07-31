@@ -298,6 +298,48 @@ export const projectGraphResponseSchema = z
 
 export type ProjectGraphResponse = z.infer<typeof projectGraphResponseSchema>;
 
+export const organizationRoleSchema = z.enum([
+  "organization-admin",
+  "project-manager",
+  "product",
+  "technical-lead",
+  "design",
+  "development",
+  "qa",
+  "finance",
+  "collaborator",
+  "client",
+  "observer",
+]);
+
+export const membershipStatusSchema = z.enum([
+  "invited",
+  "active",
+  "suspended",
+  "revoked",
+]);
+
+export const organizationMemberSchema = z
+  .object({
+    organizationId: z.string().uuid(),
+    userId: z.string().uuid(),
+    displayName: z.string().max(120).nullable(),
+    role: organizationRoleSchema,
+    status: membershipStatusSchema,
+    createdAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
+
+export type OrganizationMember = z.infer<typeof organizationMemberSchema>;
+
+export const membersListResponseSchema = z
+  .object({
+    members: z.array(organizationMemberSchema).max(1_000),
+  })
+  .strict();
+
+export type MembersListResponse = z.infer<typeof membersListResponseSchema>;
+
 export const externalActorSchema = z
   .object({
     issuer: z.string().url().max(512),

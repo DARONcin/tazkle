@@ -3,6 +3,10 @@ import { readSecretValue } from "@tazkle/service-kit";
 import { Pool, type PoolConfig } from "pg";
 import { createPostgresGraphRepository, type GraphRepository } from "./graph.js";
 import {
+  createPostgresMemberRepository,
+  type MemberRepository,
+} from "./members.js";
+import {
   createPostgresProjectRepository,
   type ProjectRepository,
 } from "./projects.js";
@@ -12,6 +16,7 @@ export type DatabaseConnection = {
   close: () => Promise<void>;
   projects: ProjectRepository;
   graph: GraphRepository;
+  members: MemberRepository;
 };
 
 export function createDatabaseConnection(
@@ -38,6 +43,9 @@ export function createDatabaseConnection(
       graph: {
         get: unavailable,
         replace: unavailable,
+      },
+      members: {
+        list: unavailable,
       },
     };
   }
@@ -70,6 +78,7 @@ export function createDatabaseConnection(
     },
     projects: createPostgresProjectRepository(pool),
     graph: createPostgresGraphRepository(pool),
+    members: createPostgresMemberRepository(pool),
   };
 }
 

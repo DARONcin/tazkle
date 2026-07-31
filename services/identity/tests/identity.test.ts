@@ -90,6 +90,27 @@ test("sign-up page keeps browser validation and an atomic live status", async ()
   assert.match(body, /src="\/identity\/client\/account\.js" defer/);
 });
 
+test("sign-in page offers password recovery that sign-up does not", async () => {
+  const app = createIdentityApp({
+    auth: {
+      handler: async () => new Response(null, { status: 204 }),
+    },
+  });
+
+  const signIn = await app.request("/sign-in?client_id=tazkle-macos");
+  const signInBody = await signIn.text();
+  const signUp = await app.request("/sign-up?client_id=tazkle-macos");
+  const signUpBody = await signUp.text();
+
+  assert.match(signInBody, /id="forgot-password-link"/);
+  assert.match(signInBody, /id="forgot-password-form" hidden/);
+  assert.match(signInBody, /id="reset-password-form" hidden/);
+  assert.match(signInBody, /autocomplete="one-time-code"/);
+  assert.doesNotMatch(signUpBody, /id="forgot-password-link"/);
+  assert.doesNotMatch(signUpBody, /id="forgot-password-form"/);
+  assert.doesNotMatch(signUpBody, /id="reset-password-form"/);
+});
+
 test("account client script performs validated sign-up and OAuth continuation", async () => {
   const app = createIdentityApp({
     auth: {
@@ -129,6 +150,10 @@ test("account client script performs validated sign-up and OAuth continuation", 
   assert.match(script, /recoveryCodesList\.replaceChildren/);
   assert.match(script, /invalid_signature/);
   assert.match(script, /Esta ventana segura expiró/);
+  assert.match(script, /\/api\/auth\/email-otp\/request-password-reset/);
+  assert.match(script, /\/api\/auth\/email-otp\/reset-password/);
+  assert.match(script, /pendingResetEmail = ""/);
+  assert.match(script, /Contraseña actualizada\. Inicia sesión con tu nueva contraseña\./);
 });
 
 test("consent page loads a same-origin script that submits the decision", async () => {

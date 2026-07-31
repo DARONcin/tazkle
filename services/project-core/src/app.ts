@@ -1,6 +1,7 @@
 import {
   createProjectCommandSchema,
   idempotencyKeySchema,
+  membersListResponseSchema,
   projectListResponseSchema,
   replaceProjectGraphCommandSchema,
   type DependencyStatus,
@@ -19,6 +20,7 @@ import {
   readInternalBearerToken,
   type InternalActorVerifier,
 } from "./identity.js";
+import type { MemberRepository } from "./members.js";
 import type { ProjectRepository } from "./projects.js";
 
 const projectIdParamSchema = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -28,6 +30,7 @@ type ProjectCoreAppOptions = {
   actorVerifier: InternalActorVerifier;
   projects: ProjectRepository;
   graph: GraphRepository;
+  members: MemberRepository;
 };
 
 export function createProjectCoreApp({
@@ -35,6 +38,7 @@ export function createProjectCoreApp({
   actorVerifier,
   projects,
   graph,
+  members,
 }: ProjectCoreAppOptions) {
   const app = createServiceApp({
     service: "project-core",
@@ -111,6 +115,16 @@ export function createProjectCoreApp({
         idempotencyKey,
       );
       return context.json(response, response.replayed ? 200 : 201);
+    } catch (error) {
+      return operationErrorResponse(context, error);
+    }
+  });
+
+  app.get("/internal/v1/members", async (context) => {
+    try {
+      const actor = await authenticateInternalRequest(context, actorVerifier);
+      const response = await members.list(actor);
+      return context.json(membersListResponseSchema.parse(response));
     } catch (error) {
       return operationErrorResponse(context, error);
     }

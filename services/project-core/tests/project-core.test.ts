@@ -7,6 +7,7 @@ import {
   InternalAuthenticationError,
   type InternalActorVerifier,
 } from "../src/identity.js";
+import type { MemberRepository } from "../src/members.js";
 import type { ProjectRepository } from "../src/projects.js";
 
 const actor = {
@@ -50,12 +51,17 @@ const graph: GraphRepository = {
   }),
 };
 
+const members: MemberRepository = {
+  list: async () => ({ members: [] }),
+};
+
 test("project core is the only service declaring domain-write authority", async () => {
   const app = createProjectCoreApp({
     databaseProbe: async () => [{ name: "postgres", status: "available" }],
     actorVerifier,
     projects,
     graph,
+    members,
   });
 
   const response = await app.request("/internal/capabilities");
@@ -79,6 +85,7 @@ test("project core readiness reflects database failure without exposing details"
     actorVerifier,
     projects,
     graph,
+    members,
   });
 
   const response = await app.request("/health/ready");
@@ -106,6 +113,7 @@ test("project core rejects a mutation without a signed internal actor", async ()
       },
     },
     graph,
+    members,
   });
 
   const response = await app.request("/internal/v1/projects", {
@@ -140,6 +148,7 @@ test("project core creates a project from the narrow command contract", async ()
       },
     },
     graph,
+    members,
   });
 
   const response = await app.request("/internal/v1/projects", {
@@ -174,6 +183,7 @@ test("project core rejects mass assignment fields", async () => {
       },
     },
     graph,
+    members,
   });
 
   const response = await app.request("/internal/v1/projects", {
@@ -200,6 +210,7 @@ test("project core reads the project graph", async () => {
     actorVerifier,
     projects,
     graph,
+    members,
   });
 
   const response = await app.request(
@@ -219,6 +230,7 @@ test("project core rejects a malformed project id", async () => {
     actorVerifier,
     projects,
     graph,
+    members,
   });
 
   const response = await app.request(
@@ -242,6 +254,7 @@ test("project core replaces the project graph atomically", async () => {
         return graph.replace(verifiedActor, forProjectId, command, "irrelevant");
       },
     },
+    members,
   });
 
   const blockId = "550e8400-e29b-41d4-a716-446655440003";
@@ -297,6 +310,7 @@ test("project core rejects a graph replace with a stale row version", async () =
         );
       },
     },
+    members,
   });
 
   const response = await app.request(
@@ -325,6 +339,7 @@ test("project core rejects a graph replace with a self-relation", async () => {
     actorVerifier,
     projects,
     graph,
+    members,
   });
 
   const blockId = "550e8400-e29b-41d4-a716-446655440003";
@@ -370,4 +385,63 @@ test("project core rejects a graph replace with a self-relation", async () => {
   );
 
   assert.equal(response.status, 400);
+});
+
+test("project core lists teammates across accessible organizations", async () => {
+  const organizationId = "550e8400-e29b-41d4-a716-446655440005";
+  const app = createProjectCoreApp({
+    databaseProbe: async () => [],
+    actorVerifier,
+    projects,
+    graph,
+    members: {
+      list: async () => ({
+        members: [
+          {
+            organizationId,
+            userId: "550e8400-e29b-41d4-a716-446655440006",
+            displayName: "Ana",
+            role: "organization-admin",
+            status: "active",
+            createdAt: "2026-07-28T18:00:00.000Z",
+          },
+        ],
+      }),
+    },
+  });
+
+  const response = await app.request("/internal/v1/members", {
+    headers: { Authorization: "Bearer internal.payload.signature" },
+  });
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.members.length, 1);
+  assert.equal(payload.members[0].displayName, "Ana");
+  assert.equal(payload.members[0].role, "organization-admin");
+});
+
+test("project core rejects a members list without a signed internal actor", async () => {
+  let repositoryCalls = 0;
+  const app = createProjectCoreApp({
+    databaseProbe: async () => [],
+    actorVerifier: {
+      verify: async () => {
+        throw new InternalAuthenticationError();
+      },
+    },
+    projects,
+    graph,
+    members: {
+      list: async () => {
+        repositoryCalls += 1;
+        throw new Error("must not be called");
+      },
+    },
+  });
+
+  const response = await app.request("/internal/v1/members");
+
+  assert.equal(response.status, 401);
+  assert.equal(repositoryCalls, 0);
 });
