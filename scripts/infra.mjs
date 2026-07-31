@@ -216,9 +216,17 @@ async function prepareSecretFiles(environment) {
     if (error?.code !== "ENOENT") {
       throw error;
     }
-    await mkdir(secretDirectory, { mode: 0o700 });
+    await mkdir(secretDirectory, { mode: 0o755 });
   }
-  await chmod(secretDirectory, 0o700);
+  // Compose (non-Swarm) secrets are plain bind mounts: each service image
+  // reads them as whatever UID its own USER directive sets (node:22-alpine
+  // uses uid 1000, postgres:alpine uses its own postgres uid), never the
+  // host uid that wrote this file. 0700/0600 works by accident on Docker
+  // Desktop's macOS file-sharing layer but is strictly enforced on Linux
+  // CI runners, where every container hit EACCES reading these. These are
+  // throwaway local/CI secrets (never committed, never baked into an
+  // image), so world-readable is an acceptable trade-off here.
+  await chmod(secretDirectory, 0o755);
 
   for (const [filename, value] of Object.entries(secrets)) {
     if (
@@ -241,8 +249,8 @@ async function prepareSecretFiles(environment) {
         throw error;
       }
     }
-    await writeFile(destination, value, { mode: 0o600 });
-    await chmod(destination, 0o600);
+    await writeFile(destination, value, { mode: 0o644 });
+    await chmod(destination, 0o644);
   }
 
   return secretDirectory;
