@@ -180,7 +180,11 @@ services:
       - /tmp:size=16m,mode=1777
     security_opt:
       - no-new-privileges:true
-    restart: "no"
+    # Postgres reporting healthy doesn't guarantee its network listener is
+    # reachable from another container yet; retry a couple of times before
+    # giving up. The runner is idempotent (checksum-tracked migrations), so
+    # a retry after a partial run just resumes where it left off.
+    restart: "on-failure:3"
 
   tazki:
     build:

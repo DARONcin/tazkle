@@ -21,11 +21,12 @@ const actions = {
   down: ["down"],
   up: ["up", "--build"],
   "up-detached": ["up", "--build", "-d"],
+  logs: ["logs", "--no-color", "--timestamps"],
 };
 
 if (action !== "init" && !(action in actions)) {
   console.error(
-    "Uso: node scripts/infra.mjs <init|config|domain-smoke|up|up-detached|down>",
+    "Uso: node scripts/infra.mjs <init|config|domain-smoke|up|up-detached|down|logs>",
   );
   process.exit(2);
 }

@@ -27,7 +27,8 @@
     "infra:config": "node scripts/infra.mjs config",
     "infra:up": "node scripts/infra.mjs up",
     "infra:up:detached": "node scripts/infra.mjs up-detached",
-    "infra:down": "node scripts/infra.mjs down"
+    "infra:down": "node scripts/infra.mjs down",
+    "infra:logs": "node scripts/infra.mjs logs"
   },
   "devDependencies": {
     "@types/node": "22.19.19",

@@ -70,6 +70,10 @@ jobs:
       - name: Verify migrations, idempotency, and tenant isolation
         run: npm run test:domain:docker
 
+      - name: Dump container logs
+        if: failure()
+        run: npm run infra:logs
+
       - name: Stop local platform
         if: always()
         run: npm run infra:down
