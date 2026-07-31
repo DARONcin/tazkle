@@ -44,6 +44,8 @@ jobs:
       TAZKLE_IDENTITY_DATABASE_PASSWORD: ci-identity-database-password-placeholder
       TAZKLE_INTERNAL_IDENTITY_SECRET: ci-internal-identity-secret-at-least-32-bytes
       TAZKLE_BETTER_AUTH_SECRET: ci-better-auth-secret-at-least-32-bytes
+      TAZKLE_RESEND_API_KEY: re_ci_placeholder_key_1234567890_not_real
+      TAZKLE_AUTH_EMAIL_FROM: "Tazkle <onboarding@resend.dev>"
       TAZKLE_OIDC_AUDIENCE: tazkle-local
 
     steps:
