@@ -17,40 +17,23 @@ struct RootView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            SidebarView()
-                .navigationSplitViewColumnWidth(min: 210, ideal: 238, max: 280)
-        } detail: {
-            detail
-                .navigationTitle("")
-                .background(TazkleColors.canvas(for: colorScheme, highContrast: highContrast))
-                .overlay(alignment: .bottomTrailing) {
-                    if appState.selectedSection != .settings,
-                       !appState.isTazkiPresented {
-                        TazkiFloatingButton {
-                            appState.presentTazki()
-                        }
-                        .padding(TazkleSpacing.xLarge)
-                    }
-                }
+        Group {
+            switch appState.workspaceContentState {
+            case .loading:
+                WorkspaceLoadingView()
+            case .empty:
+                ProjectWelcomeView()
+            case .project:
+                workspace
+            }
         }
-        .navigationSplitViewStyle(.balanced)
         .tint(TazkleColors.actionPrimary)
         .environment(\.tazkleHighContrast, highContrast)
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                ProjectNavigationMenu()
-            }
-            ToolbarItem {
-                SessionModeBadge()
-            }
-        }
-        .inspector(isPresented: trailingPanelPresentation) {
-            WorkspaceTrailingPanelView()
-                .inspectorColumnWidth(min: 300, ideal: 332, max: 380)
-        }
         .sheet(isPresented: $appState.isPresentingNewProject) {
             NewProjectFlow()
+        }
+        .sheet(isPresented: $appState.isPresentingProductTour) {
+            ProductTourView()
         }
         .sheet(isPresented: $appState.isPresentingPlanningProfile) {
             PlanningProfileSheet(profile: appState.planningProfile)
@@ -113,6 +96,69 @@ struct RootView: View {
             }
         } message: {
             Text(appState.lastError ?? "Error desconocido")
+        }
+    }
+
+    /// Por debajo de este ancho, la columna de inspector nativa no alcanza a
+    /// respetar su propio mínimo (210 sidebar + 300 inspector + lienzo) y
+    /// recorta acciones críticas. En ese rango el inspector flota sobre el
+    /// lienzo en vez de competir por ancho con la sidebar.
+    private static let compactInspectorThreshold: CGFloat = 1180
+
+    private var workspace: some View {
+        GeometryReader { proxy in
+            let isCompact = proxy.size.width < Self.compactInspectorThreshold
+
+            NavigationSplitView {
+                SidebarView()
+                    .navigationSplitViewColumnWidth(min: 210, ideal: 238, max: 280)
+            } detail: {
+                let showsTazkiButton = appState.selectedSection != .settings
+                    && !appState.isTazkiPresented
+
+                detail
+                    .navigationTitle("")
+                    .background(TazkleColors.canvas(for: colorScheme, highContrast: highContrast))
+                    // Reserva el espacio del botón flotante de Tazki (52pt + 24pt de margen)
+                    // para que el contenido desplazable de cada vista no termine debajo de él.
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        if showsTazkiButton {
+                            Color.clear.frame(height: 76)
+                        }
+                    }
+                    .overlay(alignment: .bottomTrailing) {
+                        if showsTazkiButton {
+                            TazkiFloatingButton {
+                                appState.presentTazki()
+                            }
+                            .padding(TazkleSpacing.xLarge)
+                        }
+                    }
+                    .overlay(alignment: .trailing) {
+                        if isCompact, trailingPanelPresentation.wrappedValue {
+                            CompactTrailingPanel(width: min(360, proxy.size.width * 0.9)) {
+                                trailingPanelPresentation.wrappedValue = false
+                            }
+                            .padding(.vertical, TazkleSpacing.large)
+                            .padding(.trailing, TazkleSpacing.large)
+                        }
+                    }
+            }
+            .navigationSplitViewStyle(.balanced)
+            .tint(TazkleColors.actionPrimary)
+            .environment(\.tazkleHighContrast, highContrast)
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    ProjectNavigationMenu()
+                }
+                ToolbarItem {
+                    SessionModeBadge()
+                }
+            }
+            .inspector(isPresented: isCompact ? .constant(false) : trailingPanelPresentation) {
+                WorkspaceTrailingPanelView()
+                    .inspectorColumnWidth(min: 300, ideal: 332, max: 380)
+            }
         }
     }
 
@@ -185,6 +231,49 @@ struct RootView: View {
     }
 }
 
+/// Presentación flotante del inspector para anchos de ventana compactos.
+/// Evita que la sidebar, el lienzo y el inspector se disputen ancho a la vez
+/// recortando acciones críticas; ver `RootView.compactInspectorThreshold`.
+private struct CompactTrailingPanel: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.tazkleHighContrast) private var highContrast
+    let width: CGFloat
+    let onClose: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button(action: onClose) {
+                    Image(systemName: "xmark.circle.fill")
+                        .imageScale(.medium)
+                        .foregroundStyle(TazkleColors.secondaryContent(for: colorScheme, highContrast: highContrast))
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.escape, modifiers: [])
+                .accessibilityLabel("Cerrar panel")
+                .help("Cerrar panel")
+            }
+            .padding(TazkleSpacing.small)
+
+            Divider()
+
+            WorkspaceTrailingPanelView()
+        }
+        .frame(width: width)
+        .frame(maxHeight: .infinity)
+        .background(TazkleColors.panel(for: colorScheme, highContrast: highContrast))
+        .clipShape(RoundedRectangle(cornerRadius: TazkleRadius.panel, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: TazkleRadius.panel, style: .continuous)
+                .stroke(TazkleColors.separator(for: colorScheme, highContrast: highContrast), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(highContrast ? 0 : 0.35), radius: 24, y: 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
+    }
+}
+
 private struct SessionModeBadge: View {
     @EnvironmentObject private var authentication: AuthenticationController
 
@@ -193,13 +282,8 @@ private struct SessionModeBadge: View {
         case .offline:
             Label("Sin conexión", systemImage: "wifi.slash")
                 .foregroundStyle(TazkleColors.warning)
-                .help("El trabajo permanece local hasta recuperar conexión")
-                .accessibilityHint("La sincronización y la colaboración están pausadas.")
-        case .localOnly:
-            Label("Sólo en esta Mac", systemImage: "internaldrive")
-                .foregroundStyle(TazkleColors.relationship)
-                .help("No hay una sesión remota activa")
-                .accessibilityHint("La sincronización y la colaboración no están habilitadas.")
+                .help("Sesión validada; los cambios permanecen locales hasta recuperar conexión")
+                .accessibilityHint("La sincronización está pausada y se reanudará al recuperar conexión.")
         default:
             EmptyView()
         }

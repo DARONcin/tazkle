@@ -1,12 +1,20 @@
 import { oauthProvider } from "@better-auth/oauth-provider";
 import { betterAuth } from "better-auth";
-import { jwt } from "better-auth/plugins";
+import { emailOTP, jwt, twoFactor } from "better-auth/plugins";
 import type { Pool } from "pg";
 import type { IdentityConfiguration } from "./config.js";
+import {
+  createAuthenticationEmailSender,
+  type AuthenticationEmailSender,
+} from "./email.js";
+
+export const authorizationCodeLifetimeSeconds = 60 * 10;
 
 export function createIdentityAuth(
   configuration: IdentityConfiguration,
   database: Pool,
+  emailSender: AuthenticationEmailSender =
+    createAuthenticationEmailSender(configuration),
 ) {
   const google = configuration.socialProviders.google;
   const microsoft = configuration.socialProviders.microsoft;
@@ -21,7 +29,17 @@ export function createIdentityAuth(
       enabled: true,
       minPasswordLength: 12,
       maxPasswordLength: 128,
-      requireEmailVerification: false,
+      requireEmailVerification: true,
+    },
+    emailVerification: {
+      sendOnSignUp: false,
+      sendOnSignIn: false,
+      autoSignInAfterVerification: true,
+    },
+    user: {
+      deleteUser: {
+        enabled: true,
+      },
     },
     socialProviders: {
       ...(google
@@ -82,6 +100,61 @@ export function createIdentityAuth(
       },
     },
     plugins: [
+      emailOTP({
+        async sendVerificationOTP({ email, otp, type }) {
+          await emailSender.sendOTP({
+            to: email,
+            otp,
+            kind:
+              type === "sign-in"
+                ? "two-factor"
+                : type,
+          });
+        },
+        otpLength: 6,
+        expiresIn: 5 * 60,
+        allowedAttempts: 5,
+        storeOTP: "hashed",
+        resendStrategy: "rotate",
+        disableSignUp: true,
+        overrideDefaultEmailVerification: true,
+        rateLimit: {
+          window: 60,
+          max: 3,
+        },
+      }),
+      twoFactor({
+        issuer: "Tazkle",
+        skipVerificationOnEnable: true,
+        twoFactorCookieMaxAge: 10 * 60,
+        trustDeviceMaxAge: 30 * 24 * 60 * 60,
+        totpOptions: {
+          disable: true,
+        },
+        otpOptions: {
+          async sendOTP({ user, otp }) {
+            await emailSender.sendOTP({
+              to: user.email,
+              otp,
+              kind: "two-factor",
+            });
+          },
+          digits: 6,
+          period: 5,
+          allowedAttempts: 5,
+          storeOTP: "hashed",
+        },
+        backupCodeOptions: {
+          amount: 8,
+          length: 10,
+          storeBackupCodes: "encrypted",
+        },
+        accountLockout: {
+          enabled: true,
+          maxFailedAttempts: 5,
+          durationSeconds: 15 * 60,
+        },
+      }),
       jwt({
         disableSettingJwtHeader: true,
         jwks: {
@@ -109,7 +182,7 @@ export function createIdentityAuth(
         accessTokenExpiresIn: 60 * 15,
         idTokenExpiresIn: 60 * 15,
         refreshTokenExpiresIn: 60 * 60 * 24 * 30,
-        codeExpiresIn: 60 * 5,
+        codeExpiresIn: authorizationCodeLifetimeSeconds,
         grantTypes: ["authorization_code", "refresh_token"],
         allowDynamicClientRegistration: false,
         allowUnauthenticatedClientRegistration: false,

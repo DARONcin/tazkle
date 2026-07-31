@@ -14,6 +14,9 @@ const app = createIdentityApp({
   auth,
   readiness: database.probe,
   socialProviders: enabledSocialProviders(configuration),
+  accountDeletion: {
+    userExists: database.userExists,
+  },
 });
 
 startService(app, "identity");

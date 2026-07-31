@@ -2,6 +2,7 @@ import {
   createProjectCommandSchema,
   idempotencyKeySchema,
   projectListResponseSchema,
+  replaceProjectGraphCommandSchema,
   type DependencyStatus,
   type InternalActorClaims,
 } from "@tazkle/platform-contracts";
@@ -11,26 +12,29 @@ import {
 } from "@tazkle/service-kit";
 import type { Context } from "hono";
 import { ZodError } from "zod";
+import { ProjectOperationError } from "./errors.js";
+import type { GraphRepository } from "./graph.js";
 import {
   InternalAuthenticationError,
   readInternalBearerToken,
   type InternalActorVerifier,
 } from "./identity.js";
-import {
-  ProjectOperationError,
-  type ProjectRepository,
-} from "./projects.js";
+import type { ProjectRepository } from "./projects.js";
+
+const projectIdParamSchema = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type ProjectCoreAppOptions = {
   databaseProbe: () => Promise<DependencyStatus[]>;
   actorVerifier: InternalActorVerifier;
   projects: ProjectRepository;
+  graph: GraphRepository;
 };
 
 export function createProjectCoreApp({
   databaseProbe,
   actorVerifier,
   projects,
+  graph,
 }: ProjectCoreAppOptions) {
   const app = createServiceApp({
     service: "project-core",
@@ -78,7 +82,52 @@ export function createProjectCoreApp({
     }
   });
 
+  app.get("/internal/v1/projects/:projectId/graph", async (context) => {
+    try {
+      const actor = await authenticateInternalRequest(context, actorVerifier);
+      const projectId = requireProjectId(context.req.param("projectId"));
+      const response = await graph.get(actor, projectId);
+      return context.json(response);
+    } catch (error) {
+      return operationErrorResponse(context, error);
+    }
+  });
+
+  app.put("/internal/v1/projects/:projectId/graph", async (context) => {
+    try {
+      requireJSONContentType(context.req.header("Content-Type"));
+      const actor = await authenticateInternalRequest(context, actorVerifier);
+      const projectId = requireProjectId(context.req.param("projectId"));
+      const idempotencyKey = idempotencyKeySchema.parse(
+        context.req.header("Idempotency-Key"),
+      );
+      const command = replaceProjectGraphCommandSchema.parse(
+        await context.req.json(),
+      );
+      const response = await graph.replace(
+        actor,
+        projectId,
+        command,
+        idempotencyKey,
+      );
+      return context.json(response, response.replayed ? 200 : 201);
+    } catch (error) {
+      return operationErrorResponse(context, error);
+    }
+  });
+
   return app;
+}
+
+function requireProjectId(value: string | undefined): string {
+  if (!value || !projectIdParamSchema.test(value)) {
+    throw new RequestValidationError(
+      400,
+      "INVALID_PROJECT_ID",
+      "El identificador de proyecto no es válido.",
+    );
+  }
+  return value;
 }
 
 async function authenticateInternalRequest(
@@ -139,7 +188,7 @@ function operationErrorResponse(context: Context, error: unknown): Response {
 
 class RequestValidationError extends Error {
   constructor(
-    readonly status: 415,
+    readonly status: 400 | 415,
     readonly code: string,
     message: string,
   ) {

@@ -11,10 +11,19 @@ struct TazkleDesktopApp: App {
         AppearancePreference(rawValue: appearance) ?? .automatic
     }
 
+    private var activeWorkspaceAccountID: String {
+        guard authentication.state.permitsWorkspace else { return "" }
+        return authentication.workspaceAccountID ?? ""
+    }
+
+    private var hasWorkspaceSession: Bool {
+        !activeWorkspaceAccountID.isEmpty
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
-                if authentication.state.permitsWorkspace {
+                if hasWorkspaceSession {
                     RootView()
                 } else {
                     AuthenticationGateView()
@@ -24,6 +33,13 @@ struct TazkleDesktopApp: App {
                 .environmentObject(authentication)
                 .preferredColorScheme(appearancePreference.preferredColorScheme)
                 .frame(minWidth: 980, minHeight: 680)
+                .task(id: activeWorkspaceAccountID) {
+                    if activeWorkspaceAccountID.isEmpty {
+                        appState.deactivateWorkspace()
+                    } else {
+                        appState.activateWorkspace(for: activeWorkspaceAccountID)
+                    }
+                }
         }
         .defaultSize(width: 1_420, height: 900)
         .commands {
@@ -34,13 +50,13 @@ struct TazkleDesktopApp: App {
                     appState.presentNewProject()
                 }
                 .keyboardShortcut("n", modifiers: .command)
-                .disabled(!authentication.state.permitsWorkspace)
+                .disabled(!hasWorkspaceSession)
 
                 Button("Nuevo bloque") {
                     appState.presentNewBlock()
                 }
                 .keyboardShortcut("b", modifiers: [.command, .shift])
-                .disabled(!authentication.state.permitsWorkspace)
+                .disabled(!hasWorkspaceSession || !appState.hasActiveProject)
             }
 
             CommandMenu("Proyecto") {
@@ -48,7 +64,7 @@ struct TazkleDesktopApp: App {
                     appState.presentPlanningProfile()
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
-                .disabled(!authentication.state.permitsWorkspace)
+                .disabled(!hasWorkspaceSession || !appState.hasActiveProject)
             }
 
             CommandMenu("Mapa") {
@@ -56,7 +72,7 @@ struct TazkleDesktopApp: App {
                     appState.beginRelation(sourceID: appState.selectedBlockID)
                 }
                 .keyboardShortcut("l", modifiers: .command)
-                .disabled(appState.graph.blocks.count < 2)
+                .disabled(!appState.hasActiveProject || appState.graph.blocks.count < 2)
 
                 Divider()
 
@@ -65,20 +81,24 @@ struct TazkleDesktopApp: App {
                         Text(projection.title).tag(projection)
                     }
                 }
+                .disabled(!appState.hasActiveProject)
 
                 Button("Volver al origen del lienzo") {
                     appState.canvasResetRevision += 1
                 }
                 .keyboardShortcut("0", modifiers: .command)
                 .disabled(
-                    appState.selectedSection != .projectMap
+                    !appState.hasActiveProject
+                        || (appState.selectedSection != .projectMap
                         && appState.selectedSection != .architecture
+                        )
                 )
 
                 Button("Mostrar u ocultar inspector") {
                     appState.isInspectorPresented.toggle()
                 }
                 .keyboardShortcut("i", modifiers: [.command, .option])
+                .disabled(!appState.hasActiveProject)
 
                 Divider()
 
@@ -87,7 +107,8 @@ struct TazkleDesktopApp: App {
                 }
                 .keyboardShortcut(.delete, modifiers: [])
                 .disabled(
-                    (appState.selectedRelation == nil && appState.selectedBlock == nil)
+                    !appState.hasActiveProject
+                        || (appState.selectedRelation == nil && appState.selectedBlock == nil)
                         || (appState.selectedRelation.map { !appState.canDeleteRelation($0) } ?? false)
                         || appState.selectedBlock?.state == .approved
                 )
@@ -98,7 +119,7 @@ struct TazkleDesktopApp: App {
                     appState.toggleTazki()
                 }
                 .keyboardShortcut("t", modifiers: [.command, .option])
-                .disabled(appState.selectedSection == .settings)
+                .disabled(!appState.hasActiveProject || appState.selectedSection == .settings)
 
                 Divider()
 
@@ -106,7 +127,8 @@ struct TazkleDesktopApp: App {
                     appState.presentTazki()
                 }
                 .disabled(
-                    appState.selectedSection == .settings
+                    !appState.hasActiveProject
+                        || appState.selectedSection == .settings
                         || (appState.selectedSection != .projectMap
                             && appState.selectedSection != .architecture)
                         || appState.selectedBlock == nil
@@ -114,10 +136,18 @@ struct TazkleDesktopApp: App {
             }
 
             CommandMenu("Ayuda de Tazkle") {
+                Button("Recorrido de Tazkle") {
+                    appState.presentProductTour()
+                }
+                .disabled(!hasWorkspaceSession)
+
+                Divider()
+
                 Button("Atajos de teclado") {
                     appState.isPresentingShortcuts = true
                 }
                 .keyboardShortcut("/", modifiers: .command)
+                .disabled(!hasWorkspaceSession)
             }
         }
 

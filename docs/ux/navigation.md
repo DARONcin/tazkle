@@ -9,14 +9,22 @@
 - Factibilidad.
 - Costos.
 - Plan de trabajo.
-- Perfil y configuración.
+- Configuración.
 
 El catálogo de bloques aparece únicamente en Mapa del proyecto y Arquitectura. Las demás áreas usan filtros, resúmenes e inspectores apropiados para reducir saturación.
-Perfil y configuración no compite con las áreas del proyecto: se presenta como
-la tarjeta fija de la persona en el extremo inferior de la sidebar.
+Configuración no compite con las áreas del proyecto: se presenta como una
+acción fija e inequívoca en el extremo inferior de la sidebar. La identidad
+activa aparece como contexto secundario, sin sustituir el nombre del destino.
 
 ## Proyectos y creación
 
+- Una cuenta sin proyectos abre una bienvenida independiente del espacio de
+  trabajo. No muestra sidebar, inspector ni un proyecto ficticio. Su acción
+  dominante es `Crear nuevo proyecto` y la secundaria abre un recorrido breve
+  por mapa, arquitectura, factibilidad y cotización.
+- El recorrido también permanece disponible desde `Ayuda de Tazkle` y termina
+  ofreciendo iniciar el asistente de creación. Puede cerrarse en cualquier paso
+  y respeta Reducir movimiento.
 - El encabezado de la sidebar muestra únicamente la firma completa de Tazkle:
   símbolo y wordmark aprobados.
 - El proyecto actual aparece como selector global en la barra nativa de la
@@ -40,6 +48,10 @@ la tarjeta fija de la persona en el extremo inferior de la sidebar.
   requerida para que el equipo documente la excepción.
 - Cada creación y cambio de proyecto se guarda localmente y restablece la vista
   en Resumen. Ningún dato se envía a un servicio externo.
+- Versiones anteriores podían persistir automáticamente un marcador vacío
+  `Proyecto sin nombre`. Sólo se retira cuando es el único registro, usa lienzo
+  vacío, no tiene bloques, relaciones ni perfil de planeación; cualquier
+  proyecto con contenido o perfil se conserva.
 
 Entre la firma de Tazkle y el perfil fijo, la sidebar se reparte en dos zonas de
 igual altura:
@@ -117,7 +129,7 @@ Sidebar de navegación | Contenido principal | Inspector contextual
 
 ## Cuenta y organización
 
-- Cuenta y organización reúne Perfil, Disponibilidad, Notificaciones, Apariencia,
+- Configuración reúne Perfil, Seguridad, Disponibilidad, Notificaciones, Apariencia,
   Atajos de teclado, Organización, Miembros y roles, Permisos, Plantillas, Costos
   y tarifas, IA, Sincronización y Seguridad.
 - Perfil y Organización siguen los dos mockups aprobados bajo
@@ -141,24 +153,52 @@ Sidebar de navegación | Contenido principal | Inspector contextual
 ## Entrada e identidad
 
 - Antes del espacio de trabajo, Tazkle presenta una puerta de entrada nativa con
-  correo como campo persistente del formulario, una acción dominante
-  `Continuar con correo` y una alternativa secundaria para continuar sólo en
-  esta Mac.
-- El acceso remoto abre el proveedor en el navegador mediante la sesión de
-  autenticación de macOS. El correo se usa como `login_hint`; Tazkle no lo
-  persiste, no presenta campos de contraseña y no simula una autenticación
-  propia.
-- El modo local conserva el trabajo en SQLite, pero comunica de forma persistente
-  que sincronización y colaboración no están habilitadas.
-- Una credencial conocida sin conectividad abre el proyecto en estado
-  `Sin conexión`; no se confunde con una sesión remota vigente.
+  una acción dominante `Crear cuenta`, una acción secundaria `Iniciar sesión`
+  y ninguna ruta de acceso anónima.
+- El acceso remoto abre directamente el registro o el inicio de sesión
+  correspondiente mediante la sesión de autenticación de macOS. Nombre, correo
+  y contraseña se capturan una sola vez en la pantalla alojada por Identity;
+  Tazkle no duplica esos campos ni simula una autenticación propia.
+- El trabajo sin conexión sólo está disponible después de validar una cuenta en
+  esa Mac. Una credencial y una identidad conocidas abren su propio espacio en
+  estado `Sin conexión`; no se confunden con una sesión remota vigente.
+- Cada pareja emisor + `sub` OIDC recibe un archivo SQLite separado mediante un
+  identificador derivado no reversible. Cambiar de cuenta no importa ni mezcla
+  automáticamente proyectos de otro espacio.
+- Si falta conectividad antes del primer acceso, la puerta permanece cerrada.
+  Los cambios offline se conservan localmente; la sincronización con Project
+  Core sigue marcada como pendiente en el corte funcional actual.
+- `Configuración → Seguridad` separa `Cerrar sesión en esta Mac` de
+  `Eliminar cuenta`. La segunda acción sólo se habilita online, muestra una
+  confirmación destructiva, fuerza una nueva autenticación de la misma cuenta
+  y después abre Identity para escribir `ELIMINAR`. Una cuenta distinta se
+  rechaza sin alterar la sesión activa. El regreso a la app sólo ocurre cuando
+  Identity confirma que la identidad remota ya no existe; si no puede
+  comprobarlo, muestra un error y conserva el espacio local. Cancelar
+  cualquiera de los pasos conserva la sesión y los datos.
 - La entrada define estados de configuración pendiente, restauración, espera del
   navegador, cancelación y error recuperable. El texto y el icono acompañan
   cualquier uso de color o progreso.
-- Un correo inválido conserva el valor, muestra un error ligado al campo y
-  devuelve el foco para corregirlo. `Return` ejecuta la misma acción que el
-  botón principal.
-- Perfil y configuración → Seguridad muestra el estado efectivo de esta Mac y
+- Los errores de los datos de cuenta se muestran junto al formulario alojado,
+  preservan los valores recuperables y permiten corregirlos sin reiniciar la
+  autorización. `Return` envía el formulario correspondiente.
+- Crear una cuenta cambia dentro de la misma ventana a un campo de seis dígitos
+  con `autocomplete=one-time-code`; el correo se presenta enmascarado y el foco
+  se mueve al código. Al verificarlo, la persona debe guardar los códigos de
+  recuperación antes de volver a Tazkle.
+- El alta solicita el código de forma explícita antes de mostrar ese paso y
+  comunica que la entrega puede tardar. Un reenvío invalida el código anterior
+  y pide utilizar únicamente el mensaje más reciente.
+- Si el correo ya pertenecía a una cuenta, el sistema no lo revela antes de
+  comprobar el OTP. Después de verificarlo, una contraseña que no coincide
+  cierra la sesión provisional y explica que el código sí fue correcto, con una
+  acción directa para iniciar sesión usando la contraseña vigente.
+- Iniciar sesión con contraseña no crea una sesión remota hasta completar el
+  segundo código. Reenvío, expiración, intentos agotados y bloqueo temporal se
+  comunican mediante texto y una región viva, no sólo mediante color.
+- La pantalla alojada no confía esta Mac automáticamente. Los accesos sociales
+  delegan el segundo factor al proveedor correspondiente.
+- Configuración → Seguridad muestra el estado efectivo de esta Mac y
   permite cerrar la sesión o volver a conectar una cuenta.
 
 ## Tazki en el espacio de trabajo
@@ -169,7 +209,7 @@ Sidebar de navegación | Contenido principal | Inspector contextual
   holgada. Sólo muestra el símbolo cian de brillos para identificar el acceso a
   IA; la mascota Tazki se reserva para el chat, sin sustituir su nombre, etiqueta
   accesible ni atajo.
-- Perfil y configuración no expone el botón: identidad, permisos, tarifas
+- Configuración no expone el botón: identidad, permisos, tarifas
   organizacionales y seguridad no se incorporan al contexto del asistente por
   defecto.
 - El botón abre el inspector nativo derecho. En Mapa y Arquitectura, cuando hay

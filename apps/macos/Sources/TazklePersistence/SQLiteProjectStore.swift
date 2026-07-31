@@ -1,4 +1,5 @@
 import CSQLite
+import CryptoKit
 import Foundation
 import TazkleDomain
 
@@ -71,21 +72,101 @@ public final class SQLiteProjectStore {
         sqlite3_close(database)
     }
 
-    public static func applicationSupport() throws -> SQLiteProjectStore {
-        guard let base = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first else {
-            throw SQLiteStoreError.cannotOpen("Application Support no está disponible.")
-        }
-
-        let directory = base.appendingPathComponent("Tazkle", isDirectory: true)
+    public static func applicationSupport(
+        workspaceAccountID: String
+    ) throws -> SQLiteProjectStore {
+        let directory = try applicationSupportDirectory(
+            workspaceAccountID: workspaceAccountID
+        )
         try FileManager.default.createDirectory(
             at: directory,
             withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700]
         )
         return try SQLiteProjectStore(path: directory.appendingPathComponent("tazkle.sqlite3").path)
+    }
+
+    public static func deleteApplicationSupport(
+        workspaceAccountID: String
+    ) throws {
+        guard let base = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else {
+            throw SQLiteStoreError.cannotOpen(
+                "Application Support no está disponible."
+            )
+        }
+        try deleteApplicationSupport(
+            workspaceAccountID: workspaceAccountID,
+            applicationSupportBase: base
+        )
+    }
+
+    static func deleteApplicationSupport(
+        workspaceAccountID: String,
+        applicationSupportBase: URL
+    ) throws {
+        let directory = try applicationSupportDirectory(
+            workspaceAccountID: workspaceAccountID,
+            applicationSupportBase: applicationSupportBase
+        )
+        guard FileManager.default.fileExists(atPath: directory.path) else {
+            return
+        }
+        try FileManager.default.removeItem(at: directory)
+    }
+
+    static func accountDirectoryName(
+        for workspaceAccountID: String
+    ) throws -> String {
+        let normalizedSubject = workspaceAccountID.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard
+            !normalizedSubject.isEmpty,
+            normalizedSubject.count <= 255,
+            !normalizedSubject.unicodeScalars.contains(where: {
+                CharacterSet.controlCharacters.contains($0)
+            })
+        else {
+            throw SQLiteStoreError.cannotOpen(
+                "La sesión no contiene un identificador de cuenta válido."
+            )
+        }
+        return SHA256.hash(
+            data: Data(normalizedSubject.utf8)
+        ).map { String(format: "%02x", $0) }.joined()
+    }
+
+    private static func applicationSupportDirectory(
+        workspaceAccountID: String
+    ) throws -> URL {
+        guard let base = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else {
+            throw SQLiteStoreError.cannotOpen(
+                "Application Support no está disponible."
+            )
+        }
+        return try applicationSupportDirectory(
+            workspaceAccountID: workspaceAccountID,
+            applicationSupportBase: base
+        )
+    }
+
+    static func applicationSupportDirectory(
+        workspaceAccountID: String,
+        applicationSupportBase: URL
+    ) throws -> URL {
+        let accountDirectoryName = try accountDirectoryName(
+            for: workspaceAccountID
+        )
+        return applicationSupportBase
+            .appendingPathComponent("Tazkle", isDirectory: true)
+            .appendingPathComponent("Accounts", isDirectory: true)
+            .appendingPathComponent(accountDirectoryName, isDirectory: true)
     }
 
     public func save(
@@ -267,6 +348,33 @@ public final class SQLiteProjectStore {
             try ProjectGraphValidator.validate(graph)
             return graph
         }
+    }
+
+    public func deleteProject(id projectID: UUID) throws {
+        try withStatement("DELETE FROM projects WHERE id = ?;") { statement in
+            try bind(projectID.uuidString, to: 1, in: statement)
+            try requireDone(statement)
+        }
+    }
+
+    @discardableResult
+    public func removeLegacySyntheticPlaceholderIfPresent() throws -> Bool {
+        let projects = try listProjects()
+        guard
+            projects.count == 1,
+            let summary = projects.first,
+            summary.name == "Proyecto sin nombre",
+            summary.template == .blankCanvas,
+            let graph = try loadProject(id: summary.id),
+            graph.blocks.isEmpty,
+            graph.relations.isEmpty,
+            try loadPlanningProfile(projectID: summary.id) == nil
+        else {
+            return false
+        }
+
+        try deleteProject(id: summary.id)
+        return true
     }
 
     private func migrate() throws {

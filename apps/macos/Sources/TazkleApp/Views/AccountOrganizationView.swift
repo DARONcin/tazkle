@@ -380,10 +380,8 @@ private struct ProfileSettingsView: View {
 
     private var localIdentityMessage: String {
         switch authentication.state {
-        case .localOnly:
-            "Este espacio funciona sólo en esta Mac y no tiene una identidad conectada."
         case .offline:
-            "La sesión está sin conexión y la identidad remota no está disponible."
+            "La sesión validada está sin conexión; los cambios quedan pendientes de sincronización."
         default:
             "Todavía no existe una identidad conectada."
         }
@@ -1157,6 +1155,8 @@ private struct SyncSettingsView: View {
 
 private struct SecuritySettingsView: View {
     @EnvironmentObject private var authentication: AuthenticationController
+    @EnvironmentObject private var appState: AppState
+    @State private var isConfirmingAccountDeletion = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: TazkleSpacing.xLarge) {
@@ -1213,7 +1213,74 @@ private struct SecuritySettingsView: View {
                 SettingsValueRow(title: "Exportaciones sensibles", detail: "Se registran por referencia, no por copia de contenido", value: "Evento requerido", systemImage: "square.and.arrow.up", valueColor: TazkleColors.relationship)
                 SettingsValueRow(title: "Secretos y prompts completos", detail: "Nunca deben aparecer en logs", value: "Excluidos", systemImage: "eye.slash", valueColor: TazkleColors.success)
             }
+
+            ProjectSectionCard(
+                title: "Zona de riesgo",
+                systemImage: "exclamationmark.triangle"
+            ) {
+                Text(
+                    "Eliminar la cuenta borra la identidad, revoca sus sesiones y elimina de esta Mac el espacio local asociado. No se puede deshacer."
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+                if let failure = authentication.accountDeletionFailure {
+                    Label(
+                        failure.userMessage,
+                        systemImage: "exclamationmark.circle"
+                    )
+                    .font(.callout)
+                    .foregroundStyle(TazkleColors.warning)
+                    .accessibilityElement(children: .combine)
+                }
+
+                Button("Eliminar cuenta…", role: .destructive) {
+                    isConfirmingAccountDeletion = true
+                }
+                .disabled(
+                    authentication.isDeletingAccount
+                        || !isAuthenticatedOnline
+                )
+                .accessibilityHint(
+                    "Solicita nuevamente tus credenciales y el segundo factor antes de pedirte escribir ELIMINAR."
+                )
+
+                if authentication.state == .offline {
+                    Text("Conéctate a internet para eliminar la cuenta.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
+        .confirmationDialog(
+            "¿Eliminar permanentemente tu cuenta?",
+            isPresented: $isConfirmingAccountDeletion,
+            titleVisibility: .visible
+        ) {
+            Button("Continuar con la eliminación", role: .destructive) {
+                Task {
+                    await authentication.deleteAccount {
+                        workspaceAccountID in
+                        try appState.deleteWorkspace(
+                            for: workspaceAccountID
+                        )
+                    }
+                }
+            }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text(
+                "Identity te pedirá autenticar de nuevo la misma cuenta. Después deberás escribir ELIMINAR para confirmar."
+            )
+        }
+    }
+
+    private var isAuthenticatedOnline: Bool {
+        if case .authenticated = authentication.state {
+            return true
+        }
+        return false
     }
 
     @ViewBuilder
@@ -1222,10 +1289,6 @@ private struct SecuritySettingsView: View {
         case .authenticated, .offline:
             Button("Cerrar sesión en esta Mac", role: .destructive) {
                 Task { await authentication.signOut() }
-            }
-        case .localOnly:
-            Button("Conectar cuenta…") {
-                authentication.returnToSignIn()
             }
         default:
             Button("Volver al acceso") {
@@ -1238,7 +1301,6 @@ private struct SecuritySettingsView: View {
         switch authentication.state {
         case .authenticated: "Sesión remota protegida"
         case .offline: "Sesión conocida, conexión no disponible"
-        case .localOnly: "Trabajo exclusivamente local"
         default: "Identidad pendiente"
         }
     }
@@ -1248,11 +1310,9 @@ private struct SecuritySettingsView: View {
         case .authenticated:
             "El navegador gestiona el acceso; Keychain conserva sólo la credencial de renovación y Project Core decide los permisos efectivos."
         case .offline:
-            "Puedes consultar y editar el proyecto local. La sincronización requiere renovar la sesión al recuperar conexión."
-        case .localOnly:
-            "No existe una identidad remota activa. Tus proyectos permanecen en esta Mac y no se comparten."
+            "Puedes consultar y editar el espacio de esta cuenta. Los cambios quedan pendientes hasta renovar la sesión al recuperar conexión."
         default:
-            "Configura o inicia una sesión OIDC antes de usar colaboración y sincronización."
+            "Configura o inicia una sesión OIDC antes de abrir proyectos."
         }
     }
 
@@ -1260,7 +1320,6 @@ private struct SecuritySettingsView: View {
         switch authentication.state {
         case .authenticated: "lock.shield.fill"
         case .offline: "wifi.slash"
-        case .localOnly: "internaldrive"
         default: "person.badge.key"
         }
     }
@@ -1268,7 +1327,6 @@ private struct SecuritySettingsView: View {
     private var noticeColor: Color {
         switch authentication.state {
         case .authenticated: TazkleColors.success
-        case .localOnly: TazkleColors.relationship
         default: TazkleColors.warning
         }
     }
@@ -1277,7 +1335,6 @@ private struct SecuritySettingsView: View {
         switch authentication.state {
         case .authenticated: "Conectado"
         case .offline: "Sin conexión"
-        case .localOnly: "Local"
         default: "Pendiente"
         }
     }
@@ -1285,8 +1342,7 @@ private struct SecuritySettingsView: View {
     private var accessDetail: String {
         switch authentication.state {
         case .authenticated: "Identidad remota disponible"
-        case .offline: "Trabajo local; sincronización pausada"
-        case .localOnly: "Sin identidad ni colaboración remota"
+        case .offline: "Sesión validada; sincronización pausada"
         default: "Requiere inicio de sesión"
         }
     }
@@ -1294,7 +1350,6 @@ private struct SecuritySettingsView: View {
     private var credentialValue: String {
         switch authentication.state {
         case .authenticated, .offline: "Keychain"
-        case .localOnly: "Ninguna"
         default: "Pendiente"
         }
     }
@@ -1309,7 +1364,6 @@ private struct SecuritySettingsView: View {
     private var accessAccent: Color {
         switch authentication.state {
         case .authenticated: TazkleColors.success
-        case .localOnly: TazkleColors.relationship
         default: TazkleColors.warning
         }
     }

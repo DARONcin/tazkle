@@ -302,8 +302,11 @@ struct ProjectListRow<Leading: View, Trailing: View>: View {
     var body: some View {
         HStack(alignment: .center, spacing: TazkleSpacing.medium) {
             leading
-            Spacer(minLength: TazkleSpacing.large)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             trailing
+                .fixedSize()
+                .layoutPriority(1)
         }
         .padding(.vertical, TazkleSpacing.small)
         .overlay(alignment: .bottom) {

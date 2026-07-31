@@ -1,14 +1,18 @@
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
+import { createInterface } from "node:readline/promises";
 
 const origin = process.env.TAZKLE_SMOKE_ORIGIN ?? "http://127.0.0.1:8787";
 const issuer = `${origin}/api/auth`;
 const clientID = "tazkle-macos";
 const redirectURI = "app.tazkle.desktop:/oauth/callback";
 const resource = "tazkle-local";
-const email =
-  process.env.TAZKLE_SMOKE_EMAIL ??
-  `auth-smoke-${Date.now()}@example.invalid`;
+const email = process.env.TAZKLE_SMOKE_EMAIL;
+if (!email) {
+  throw new Error(
+    "TAZKLE_SMOKE_EMAIL is required; use an address authorized by the configured email provider",
+  );
+}
 const password =
   process.env.TAZKLE_SMOKE_PASSWORD ??
   `Smoke-${randomBytes(18).toString("base64url")}`;
@@ -50,6 +54,7 @@ authorizationURL.search = new URLSearchParams({
   code_challenge: challenge,
   code_challenge_method: "S256",
   resource,
+  prompt: "create",
 }).toString();
 
 const authorizationResponse = await request(authorizationURL, {
@@ -57,9 +62,15 @@ const authorizationResponse = await request(authorizationURL, {
   redirect: "manual",
 });
 assert.equal(authorizationResponse.status, 302);
-const signInLocation = requiredLocation(authorizationResponse);
-assert.equal(signInLocation.pathname, "/sign-in");
-const oauthQuery = signInLocation.search.slice(1);
+const signUpLocation = requiredLocation(authorizationResponse);
+assert.equal(signUpLocation.pathname, "/sign-up");
+const signedRequestIssuedAt = Number(signUpLocation.searchParams.get("ba_iat"));
+const signedRequestExpiresAt = Number(signUpLocation.searchParams.get("exp"));
+assert.equal(
+  signedRequestExpiresAt - Math.floor(signedRequestIssuedAt / 1_000),
+  10 * 60,
+);
+const oauthQuery = signUpLocation.search.slice(1);
 
 const signUp = await request(`${origin}/api/auth/sign-up/email`, {
   method: "POST",
@@ -73,8 +84,67 @@ const signUp = await request(`${origin}/api/auth/sign-up/email`, {
   }),
 });
 const signUpPayload = await checkedJSON(signUp, 200);
-assert.equal(typeof signUpPayload.url, "string");
-const consentLocation = new URL(signUpPayload.url, origin);
+assert.equal(signUpPayload.user.email, email);
+assert.equal(signUpPayload.user.emailVerified, false);
+
+await checkedJSON(
+  await request(
+    `${origin}/api/auth/email-otp/send-verification-otp`,
+    {
+      method: "POST",
+      headers: jsonHeaders(),
+      body: JSON.stringify({
+        email,
+        type: "email-verification",
+      }),
+    },
+  ),
+  200,
+);
+
+const emailOTP = await verificationCode(
+  "TAZKLE_SMOKE_EMAIL_OTP",
+  "Código de verificación enviado por correo: ",
+);
+const verification = await request(
+  `${origin}/api/auth/email-otp/verify-email`,
+  {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({
+      email,
+      otp: emailOTP,
+    }),
+  },
+);
+const verificationPayload = await checkedJSON(verification, 200);
+assert.equal(verificationPayload.status, true);
+assert.equal(verificationPayload.user.emailVerified, true);
+
+const enableTwoFactor = await request(
+  `${origin}/api/auth/two-factor/enable`,
+  {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({
+      password,
+      issuer: "Tazkle",
+    }),
+  },
+);
+const enrollment = await checkedJSON(enableTwoFactor, 200);
+assert.equal(enrollment.backupCodes.length, 8);
+
+const continueSignUp = await request(`${origin}/api/auth/oauth2/continue`, {
+  method: "POST",
+  headers: jsonHeaders(),
+  body: JSON.stringify({
+    created: true,
+    oauth_query: oauthQuery,
+  }),
+});
+const continuePayload = await checkedJSON(continueSignUp, 200);
+const consentLocation = new URL(continuePayload.url, origin);
 assert.equal(consentLocation.pathname, "/consent");
 
 const consent = await request(`${origin}/api/auth/oauth2/consent`, {
@@ -146,11 +216,40 @@ assert.equal(refreshed.access_token.split(".").length, 3);
 console.info(
   JSON.stringify({
     status: "ok",
-    flow: "email-signup-pkce-consent-token-userinfo-refresh",
-    email,
+    flow: "email-verification-2fa-enrollment-pkce-consent-token-userinfo-refresh",
+    email: maskEmail(email),
     emailVerified: userInfo.email_verified === true,
   }),
 );
+
+async function verificationCode(environmentName, prompt) {
+  const configured = process.env[environmentName]?.trim();
+  if (configured) {
+    assert.match(configured, /^\d{6}$/);
+    return configured;
+  }
+  if (!process.stdin.isTTY) {
+    throw new Error(
+      `${environmentName} is required when stdin is not interactive`,
+    );
+  }
+  const terminal = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  try {
+    const value = (await terminal.question(prompt)).trim();
+    assert.match(value, /^\d{6}$/);
+    return value;
+  } finally {
+    terminal.close();
+  }
+}
+
+function maskEmail(value) {
+  const [name, domain] = value.split("@");
+  return `${name.slice(0, 2)}•••@${domain}`;
+}
 
 async function request(input, init) {
   const headers = new Headers(init?.headers);

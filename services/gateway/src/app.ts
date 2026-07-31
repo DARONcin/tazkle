@@ -5,7 +5,9 @@ import {
   HTTP_HEADERS,
   idempotencyKeySchema,
   platformCapabilitiesSchema,
+  projectGraphResponseSchema,
   projectListResponseSchema,
+  replaceProjectGraphCommandSchema,
   serviceCapabilitySchema,
   type HealthResponse,
   type ServiceCapability,
@@ -131,7 +133,15 @@ export function createGatewayApp({
     (context) => proxyIdentityRequest(context, urls.identity, fetchImplementation),
   );
 
-  for (const pagePath of ["/sign-in", "/sign-up", "/consent"]) {
+  for (const pagePath of [
+    "/sign-in",
+    "/sign-up",
+    "/consent",
+    "/account/delete",
+    "/identity/client/account.js",
+    "/identity/client/consent.js",
+    "/identity/client/delete-account.js",
+  ]) {
     app.get(pagePath, (context) => {
       return proxyIdentityRequest(context, urls.identity, fetchImplementation);
     });
@@ -194,6 +204,68 @@ export function createGatewayApp({
         response,
         createProjectResponseSchema,
       );
+    } catch (error) {
+      return gatewayOperationError(context, error);
+    }
+  });
+
+  app.get("/v1/projects/:projectId/graph", async (context) => {
+    try {
+      requireJSONAccept(context.req.header("Accept"));
+      const internalToken = await authenticateAndSign(
+        context,
+        accessTokens,
+        internalActors,
+      );
+      const response = await fetchInternal(
+        new URL(
+          `/internal/v1/projects/${context.req.param("projectId")}/graph`,
+          urls.projectCore,
+        ),
+        {
+          method: "GET",
+          headers: internalHeaders(internalToken),
+        },
+        fetchImplementation,
+      );
+      return proxyProjectResponse(context, response, projectGraphResponseSchema);
+    } catch (error) {
+      return gatewayOperationError(context, error);
+    }
+  });
+
+  app.put("/v1/projects/:projectId/graph", async (context) => {
+    try {
+      requireJSONAccept(context.req.header("Accept"));
+      requireJSONContentType(context.req.header("Content-Type"));
+      const idempotencyKey = idempotencyKeySchema.parse(
+        context.req.header(HTTP_HEADERS.idempotencyKey),
+      );
+      const internalToken = await authenticateAndSign(
+        context,
+        accessTokens,
+        internalActors,
+      );
+      const command = replaceProjectGraphCommandSchema.parse(
+        await context.req.json(),
+      );
+      const response = await fetchInternal(
+        new URL(
+          `/internal/v1/projects/${context.req.param("projectId")}/graph`,
+          urls.projectCore,
+        ),
+        {
+          method: "PUT",
+          headers: {
+            ...internalHeaders(internalToken),
+            "Content-Type": "application/json",
+            [HTTP_HEADERS.idempotencyKey]: idempotencyKey,
+          },
+          body: JSON.stringify(command),
+        },
+        fetchImplementation,
+      );
+      return proxyProjectResponse(context, response, projectGraphResponseSchema);
     } catch (error) {
       return gatewayOperationError(context, error);
     }
@@ -362,12 +434,16 @@ async function identityBrowserRedirect(
   if (!location) {
     return undefined;
   }
+  const headers = new Headers({
+    Location: location,
+    "Cache-Control": "no-store",
+  });
+  for (const cookie of response.headers.getSetCookie()) {
+    headers.append("Set-Cookie", cookie);
+  }
   return new Response(null, {
     status: 302,
-    headers: {
-      Location: location,
-      "Cache-Control": "no-store",
-    },
+    headers,
   });
 }
 

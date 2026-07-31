@@ -14,19 +14,23 @@ struct ArchitectureConnectionRoute {
         points.last ?? .zero
     }
 
-    var label: CGPoint {
+    /// Punto sobre el recorrido a la fracción de longitud indicada (0 = origen, 1 = destino).
+    /// Varias relaciones que comparten origen o destino comparten también el tramo inicial o
+    /// final del recorrido; usar una fracción distinta por relación evita que sus etiquetas se
+    /// superpongan en ese tramo compartido. `0.5` reproduce el punto medio tradicional.
+    func label(fraction: CGFloat = 0.5) -> CGPoint {
         guard points.count > 1 else { return start }
         let segmentLengths = zip(points, points.dropFirst()).map { pair in
             hypot(pair.1.x - pair.0.x, pair.1.y - pair.0.y)
         }
-        let halfLength = segmentLengths.reduce(0, +) / 2
+        let targetLength = segmentLengths.reduce(0, +) * min(max(fraction, 0), 1)
         var traversed: CGFloat = 0
 
         for (index, length) in segmentLengths.enumerated() {
-            guard traversed + length < halfLength else {
+            guard traversed + length < targetLength else {
                 let start = points[index]
                 let end = points[index + 1]
-                let progress = length > 0 ? (halfLength - traversed) / length : 0
+                let progress = length > 0 ? (targetLength - traversed) / length : 0
                 return CGPoint(
                     x: start.x + (end.x - start.x) * progress,
                     y: start.y + (end.y - start.y) * progress

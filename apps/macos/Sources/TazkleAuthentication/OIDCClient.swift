@@ -24,7 +24,7 @@ actor OIDCClient {
     }
 
     func makeAuthorizationRequest(
-        loginHint: EmailLoginHint?
+        intent: AccountAuthorizationIntent
     ) async throws -> AuthorizationRequest {
         let metadata = try await providerMetadata()
         let state = try Self.randomURLSafeValue(byteCount: 32)
@@ -34,7 +34,7 @@ actor OIDCClient {
             configuration: configuration,
             state: state,
             codeVerifier: codeVerifier,
-            loginHint: loginHint
+            intent: intent
         )
     }
 
@@ -307,7 +307,7 @@ actor OIDCClient {
         configuration: OIDCConfiguration,
         state: String,
         codeVerifier: String,
-        loginHint: EmailLoginHint?
+        intent: AccountAuthorizationIntent
     ) throws -> AuthorizationRequest {
         var components = URLComponents(
             url: metadata.authorizationEndpoint,
@@ -326,8 +326,10 @@ actor OIDCClient {
         if let resource = configuration.resource {
             queryItems.append(URLQueryItem(name: "resource", value: resource))
         }
-        if let loginHint {
-            queryItems.append(URLQueryItem(name: "login_hint", value: loginHint.value))
+        if intent == .signUp {
+            queryItems.append(URLQueryItem(name: "prompt", value: "create"))
+        } else if intent == .reauthenticate {
+            queryItems.append(URLQueryItem(name: "prompt", value: "login"))
         }
         components?.queryItems = queryItems
 

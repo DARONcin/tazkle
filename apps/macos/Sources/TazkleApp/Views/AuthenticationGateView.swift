@@ -4,18 +4,12 @@ import TazkleDesignSystem
 
 struct AuthenticationGateView: View {
     @EnvironmentObject private var authentication: AuthenticationController
+    @EnvironmentObject private var appState: AppState
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("appearancePreference") private var appearance =
         AppearancePreference.automatic.rawValue
-    @State private var emailAddress = ""
-    @State private var emailValidationAttempted = false
-    @FocusState private var focusedField: Field?
-
-    private enum Field {
-        case email
-    }
 
     private var highContrast: Bool {
         AppearancePreference(rawValue: appearance)?.usesHighContrastTokens == true
@@ -89,66 +83,32 @@ struct AuthenticationGateView: View {
 
             stateNotice
 
-            VStack(alignment: .leading, spacing: TazkleSpacing.small) {
-                Text("Correo electrónico")
-                    .font(.callout.weight(.medium))
-
-                HStack(spacing: TazkleSpacing.small) {
-                    Image(systemName: "envelope")
-                        .foregroundStyle(.secondary)
-                        .accessibilityHidden(true)
-                    TextField("nombre@empresa.com", text: $emailAddress)
-                        .textFieldStyle(.plain)
-                        .textContentType(.emailAddress)
-                        .autocorrectionDisabled()
-                        .focused($focusedField, equals: .email)
-                        .onSubmit(beginEmailSignIn)
-                        .accessibilityLabel("Correo electrónico")
-                }
-                .padding(.horizontal, TazkleSpacing.medium)
-                .padding(.vertical, TazkleSpacing.medium)
-                .background(
-                    TazkleColors.elevated(
-                        for: colorScheme,
-                        highContrast: highContrast
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: TazkleRadius.control))
-                .overlay {
-                    RoundedRectangle(cornerRadius: TazkleRadius.control)
-                        .stroke(
-                            emailHasError
-                                ? TazkleColors.warning
-                                : TazkleColors.separator(
-                                    for: colorScheme,
-                                    highContrast: highContrast
-                                ),
-                            lineWidth: emailHasError ? 2 : 1
+            if authentication.hasPendingLocalAccountCleanup {
+                Button {
+                    authentication.retryPendingLocalAccountCleanup {
+                        workspaceAccountID in
+                        try appState.deleteWorkspace(
+                            for: workspaceAccountID
                         )
-                }
-                .disabled(isBusy)
-
-                if emailHasError {
+                    }
+                } label: {
                     Label(
-                        "Escribe un correo válido para continuar.",
-                        systemImage: "exclamationmark.circle"
+                        "Eliminar datos locales pendientes",
+                        systemImage: "trash"
                     )
-                    .font(.caption)
-                    .foregroundStyle(TazkleColors.warning)
-                    .accessibilityLabel(
-                        "Error en correo electrónico. Escribe un correo válido para continuar."
-                    )
-                } else {
-                    Text("No se guarda en preferencias ni en SQLite.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, TazkleSpacing.small)
                 }
+                .buttonStyle(.bordered)
+                .accessibilityHint(
+                    "Vuelve a intentar eliminar de esta Mac la copia de la cuenta que ya se borró del servidor."
+                )
             }
 
             VStack(spacing: TazkleSpacing.medium) {
-                Button(action: beginEmailSignIn) {
+                Button(action: beginSignUp) {
                     HStack {
-                        Image(systemName: "envelope.fill")
+                        Image(systemName: "person.badge.plus")
                             .accessibilityHidden(true)
                         Text(primaryActionTitle)
                         Spacer()
@@ -178,25 +138,41 @@ struct AuthenticationGateView: View {
                 .disabled(authentication.configuration == nil || isBusy)
                 .keyboardShortcut(.defaultAction)
                 .accessibilityHint(
-                    "Abre el proveedor de identidad en el navegador seguro de macOS."
+                    "Abre directamente el registro seguro de Tazkle en el navegador de macOS."
                 )
 
-                Button {
-                    authentication.continueLocally()
-                } label: {
-                    Label("Continuar sólo en esta Mac", systemImage: "internaldrive")
+                Button(action: beginSignIn) {
+                    Label("Iniciar sesión", systemImage: "person.crop.circle")
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, TazkleSpacing.small)
                 }
                 .buttonStyle(.bordered)
-                .disabled(isBusy)
+                .disabled(authentication.configuration == nil || isBusy)
                 .accessibilityHint(
-                    "Abre los proyectos locales sin sincronización ni colaboración."
+                    "Abre el acceso para una cuenta existente en el navegador seguro de macOS."
                 )
+
+                if authentication.state == .authorizing {
+                    Button {
+                        authentication.returnToSignIn()
+                    } label: {
+                        Label(
+                            "Cancelar y volver a intentarlo",
+                            systemImage: "arrow.counterclockwise"
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, TazkleSpacing.small)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityHint(
+                        "Cierra el acceso actual y habilita nuevamente las opciones de cuenta."
+                    )
+                }
+
             }
 
             Label(
-                "Tu contraseña permanece en el proveedor de identidad",
+                "Se requiere una sesión validada; después podrás trabajar sin conexión",
                 systemImage: "lock.shield"
             )
             .font(.caption)
@@ -226,51 +202,60 @@ struct AuthenticationGateView: View {
 
     @ViewBuilder
     private var stateNotice: some View {
-        switch authentication.state {
-        case .configurationRequired:
+        if let accountFailure = authentication.accountDeletionFailure {
             AccessNotice(
-                title: "Proveedor pendiente de configurar",
-                detail: "Puedes trabajar localmente. El acceso remoto se habilitará al registrar el cliente OIDC de Tazkle.",
-                systemImage: "wrench.and.screwdriver",
-                color: TazkleColors.warning
-            )
-        case .failed(let failure):
-            AccessNotice(
-                title: "No se completó el acceso",
-                detail: failure.userMessage,
+                title: "Revisa la seguridad de esta Mac",
+                detail: accountFailure.userMessage,
                 systemImage: "exclamationmark.triangle",
                 color: TazkleColors.warning
             )
-        case .restoring:
-            AccessNotice(
-                title: "Restaurando sesión",
-                detail: "Validando la credencial guardada de forma segura en esta Mac.",
-                systemImage: "arrow.triangle.2.circlepath",
-                color: TazkleColors.assistantProposal
-            )
-        case .authorizing:
-            AccessNotice(
-                title: "Completa el acceso en el navegador",
-                detail: "Regresa a Tazkle cuando el proveedor confirme tu identidad.",
-                systemImage: "safari",
-                color: TazkleColors.assistantProposal
-            )
-        default:
-            EmptyView()
+        } else {
+            switch authentication.state {
+            case .configurationRequired:
+                AccessNotice(
+                    title: "Proveedor pendiente de configurar",
+                    detail: "Tazkle necesita un proveedor OIDC válido antes de abrir cualquier proyecto.",
+                    systemImage: "wrench.and.screwdriver",
+                    color: TazkleColors.warning
+                )
+            case .failed(let failure):
+                AccessNotice(
+                    title: "No se completó el acceso",
+                    detail: failure.userMessage,
+                    systemImage: "exclamationmark.triangle",
+                    color: TazkleColors.warning
+                )
+            case .restoring:
+                AccessNotice(
+                    title: "Restaurando sesión",
+                    detail: "Validando la credencial guardada de forma segura en esta Mac.",
+                    systemImage: "arrow.triangle.2.circlepath",
+                    color: TazkleColors.assistantProposal
+                )
+            case .authorizing:
+                AccessNotice(
+                    title: "Completa el acceso en el navegador",
+                    detail: "Escribe ahí tus datos una sola vez. Si cerraste la ventana, cancela este intento para comenzar otro.",
+                    systemImage: "safari",
+                    color: TazkleColors.assistantProposal
+                )
+            default:
+                EmptyView()
+            }
         }
     }
 
     private var accessSubtitle: String {
         authentication.configuration == nil
-            ? "Conecta tu identidad para colaborar o entra en modo local."
-            : "Inicia sesión para sincronizar proyectos y colaborar con tu equipo."
+            ? "Configura el proveedor de identidad para iniciar una sesión."
+            : "Tu cuenta identifica el espacio local y evita mezclar proyectos entre sesiones."
     }
 
     private var primaryActionTitle: String {
         switch authentication.state {
         case .authorizing: "Esperando al navegador…"
         case .restoring: "Restaurando sesión…"
-        default: "Continuar con correo"
+        default: "Crear cuenta"
         }
     }
 
@@ -278,23 +263,15 @@ struct AuthenticationGateView: View {
         authentication.state == .authorizing || authentication.state == .restoring
     }
 
-    private var emailHint: EmailLoginHint? {
-        EmailLoginHint(emailAddress)
-    }
-
-    private var emailHasError: Bool {
-        emailValidationAttempted && emailHint == nil
-    }
-
-    private func beginEmailSignIn() {
-        emailValidationAttempted = true
-        guard let emailHint else {
-            focusedField = .email
-            return
-        }
-        focusedField = nil
+    private func beginSignUp() {
         Task {
-            await authentication.signIn(email: emailHint)
+            await authentication.signUp()
+        }
+    }
+
+    private func beginSignIn() {
+        Task {
+            await authentication.signIn()
         }
     }
 }

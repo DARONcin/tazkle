@@ -6,7 +6,12 @@ cd "$root"
 
 failure=0
 
-tracked_secrets="$(git ls-files | rg '(^|/)(\.env($|\.)|.*\.(pem|p12|key|mobileprovision)$)' || true)"
+tracked_secrets="$(
+  git ls-files \
+    | rg '(^|/)(\.env($|\.)|.*\.(pem|p12|key|mobileprovision)$)' \
+    | rg -v '(^|/)\.env\.(example|sample|template)$' \
+    || true
+)"
 if [[ -n "$tracked_secrets" ]]; then
   echo "security-baseline: secret-like files are tracked:"
   printf '%s\n' "$tracked_secrets"

@@ -137,8 +137,8 @@ private struct ArchitectureDiagramView: View {
 
     private let bandHeight: CGFloat = 190
     private let labelWidth: CGFloat = 180
-    private let cardWidth: CGFloat = 218
-    private let cardHeight: CGFloat = 128
+    private let cardWidth: CGFloat = 236
+    private let cardHeight: CGFloat = 148
     private let cardSpacing: CGFloat = 34
 
     private var visibleLayers: [ArchitectureLayer] {
@@ -521,6 +521,7 @@ private struct ArchitectureDiagramView: View {
                 }
             }
 
+            let labelFractionByRelation = labelFractions(for: appState.graph.relations)
             ForEach(appState.graph.relations) { relation in
                 if let start = displayedPositions[relation.sourceID],
                    let end = displayedPositions[relation.targetID] {
@@ -532,10 +533,47 @@ private struct ArchitectureDiagramView: View {
                         targetPort: relation.targetPort
                     )
                     RelationCanvasControl(relation: relation)
-                        .position(route.label)
+                        .position(route.label(fraction: labelFractionByRelation[relation.id] ?? 0.5))
                 }
             }
         }
+    }
+
+    /// Relaciones que comparten origen o destino comparten también un tramo de su recorrido
+    /// ortogonal; separa la fracción de etiqueta de cada una para que no se superpongan sobre
+    /// ese tramo compartido (ver `ArchitectureConnectionRoute.label(fraction:)`).
+    private func labelFractions(for relations: [BlockRelation]) -> [UUID: CGFloat] {
+        var bySource: [UUID: [UUID]] = [:]
+        var byTarget: [UUID: [UUID]] = [:]
+        for relation in relations {
+            bySource[relation.sourceID, default: []].append(relation.id)
+            byTarget[relation.targetID, default: []].append(relation.id)
+        }
+
+        func spread(_ siblings: [UUID]?, for id: UUID, ascending: Bool) -> CGFloat? {
+            guard let siblings, siblings.count > 1,
+                  let index = siblings.firstIndex(of: id) else { return nil }
+            let step = 0.3 / CGFloat(siblings.count - 1)
+            let offset = CGFloat(index) * step - 0.15
+            return ascending ? 0.5 + offset : 0.5 - offset
+        }
+
+        var fractions: [UUID: CGFloat] = [:]
+        for relation in relations {
+            let fromSource = spread(bySource[relation.sourceID], for: relation.id, ascending: true)
+            let fromTarget = spread(byTarget[relation.targetID], for: relation.id, ascending: false)
+            switch (fromSource, fromTarget) {
+            case let (source?, target?):
+                fractions[relation.id] = (source + target) / 2
+            case let (source?, nil):
+                fractions[relation.id] = source
+            case let (nil, target?):
+                fractions[relation.id] = target
+            case (nil, nil):
+                continue
+            }
+        }
+        return fractions
     }
 
     private var blockCards: some View {
@@ -562,7 +600,8 @@ private struct ArchitectureDiagramView: View {
                     ArchitectureBlockCard(
                         block: block,
                         isDragging: blockDrag?.blockID == block.id,
-                        isConnectionTarget: connectionDraft?.targetID == block.id
+                        isConnectionTarget: connectionDraft?.targetID == block.id,
+                        size: CGSize(width: cardWidth, height: cardHeight)
                     )
                     .highPriorityGesture(
                         dragGesture(for: block),
@@ -945,17 +984,18 @@ private struct ArchitectureBlockCard: View {
     let block: ProjectBlock
     let isDragging: Bool
     let isConnectionTarget: Bool
+    let size: CGSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: TazkleSpacing.medium) {
-            HStack {
+            HStack(alignment: .top) {
                 Image(systemName: block.architectureLayer?.systemImage ?? block.family.systemImage)
                     .font(.headline)
                     .foregroundStyle(block.architectureLayer?.accentColor ?? block.family.accentColor)
                 Text(block.title)
                     .font(.headline)
-                    .lineLimit(1)
-                Spacer()
+                    .lineLimit(2)
+                Spacer(minLength: TazkleSpacing.small)
                 Image(systemName: block.state.systemImage)
                     .foregroundStyle(block.state == .warning ? TazkleColors.warning : .secondary)
             }
@@ -971,7 +1011,7 @@ private struct ArchitectureBlockCard: View {
                 .foregroundStyle(block.architectureLayer?.accentColor ?? .secondary)
         }
         .padding(TazkleSpacing.large)
-        .frame(width: 218, height: 128, alignment: .topLeading)
+        .frame(width: size.width, height: size.height, alignment: .topLeading)
         .background(
             TazkleColors.elevated(
                 for: colorScheme,

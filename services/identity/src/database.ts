@@ -5,6 +5,7 @@ import type { IdentityConfiguration } from "./config.js";
 export type IdentityDatabase = {
   pool: Pool;
   probe: () => Promise<DependencyStatus[]>;
+  userExists: (userID: string) => Promise<boolean>;
   close: () => Promise<void>;
 };
 
@@ -34,6 +35,13 @@ export function createIdentityDatabase(
           },
         ];
       }
+    },
+    userExists: async (userID: string) => {
+      const result = await pool.query(
+        'SELECT 1 FROM auth."user" WHERE "id" = $1 LIMIT 1',
+        [userID],
+      );
+      return result.rowCount === 1;
     },
     close: async () => {
       await pool.end();

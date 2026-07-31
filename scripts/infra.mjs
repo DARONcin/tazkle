@@ -21,11 +21,12 @@ const actions = {
   down: ["down"],
   up: ["up", "--build"],
   "up-detached": ["up", "--build", "-d"],
+  logs: ["logs", "--no-color", "--timestamps"],
 };
 
 if (action !== "init" && !(action in actions)) {
   console.error(
-    "Uso: node scripts/infra.mjs <init|config|domain-smoke|up|up-detached|down>",
+    "Uso: node scripts/infra.mjs <init|config|domain-smoke|up|up-detached|down|logs>",
   );
   process.exit(2);
 }
@@ -149,6 +150,8 @@ async function initializeLocalEnvironment(destination) {
     `TAZKLE_IDENTITY_DATABASE_PASSWORD=${secret()}`,
     `TAZKLE_INTERNAL_IDENTITY_SECRET=${secret()}`,
     `TAZKLE_BETTER_AUTH_SECRET=${secret()}`,
+    "TAZKLE_RESEND_API_KEY=",
+    "TAZKLE_AUTH_EMAIL_FROM=Tazkle <onboarding@resend.dev>",
     "TAZKLE_BETTER_AUTH_URL=http://127.0.0.1:8787/api/auth",
     "TAZKLE_OIDC_ISSUER=http://127.0.0.1:8787/api/auth",
     "TAZKLE_OIDC_AUDIENCE=tazkle-local",
@@ -191,6 +194,7 @@ async function prepareSecretFiles(environment) {
     "identity-db-password": environment.TAZKLE_IDENTITY_DATABASE_PASSWORD,
     "internal-identity-secret": environment.TAZKLE_INTERNAL_IDENTITY_SECRET,
     "better-auth-secret": environment.TAZKLE_BETTER_AUTH_SECRET,
+    "resend-api-key": environment.TAZKLE_RESEND_API_KEY,
     "google-oauth-secret": optionalProviderSecret(
       environment.TAZKLE_GOOGLE_CLIENT_ID,
       environment.TAZKLE_GOOGLE_CLIENT_SECRET,
@@ -212,9 +216,17 @@ async function prepareSecretFiles(environment) {
     if (error?.code !== "ENOENT") {
       throw error;
     }
-    await mkdir(secretDirectory, { mode: 0o700 });
+    await mkdir(secretDirectory, { mode: 0o755 });
   }
-  await chmod(secretDirectory, 0o700);
+  // Compose (non-Swarm) secrets are plain bind mounts: each service image
+  // reads them as whatever UID its own USER directive sets (node:22-alpine
+  // uses uid 1000, postgres:alpine uses its own postgres uid), never the
+  // host uid that wrote this file. 0700/0600 works by accident on Docker
+  // Desktop's macOS file-sharing layer but is strictly enforced on Linux
+  // CI runners, where every container hit EACCES reading these. These are
+  // throwaway local/CI secrets (never committed, never baked into an
+  // image), so world-readable is an acceptable trade-off here.
+  await chmod(secretDirectory, 0o755);
 
   for (const [filename, value] of Object.entries(secrets)) {
     if (
@@ -237,8 +249,8 @@ async function prepareSecretFiles(environment) {
         throw error;
       }
     }
-    await writeFile(destination, value, { mode: 0o600 });
-    await chmod(destination, 0o600);
+    await writeFile(destination, value, { mode: 0o644 });
+    await chmod(destination, 0o644);
   }
 
   return secretDirectory;

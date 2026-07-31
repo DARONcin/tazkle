@@ -14,13 +14,14 @@ Primer corte ejecutable del núcleo visual y local de Tazkle.
 
 El cliente implementa Authorization Code con PKCE S256 mediante
 `ASWebAuthenticationSession`. La contraseña y el segundo factor permanecen en
-el proveedor OIDC; Tazkle conserva el refresh token únicamente en Keychain y
-mantiene el access token corto en memoria.
+el proveedor OIDC; Tazkle conserva el refresh token y una identidad validada
+acotada en Keychain, y mantiene el access token corto en memoria.
 
-La puerta de entrada solicita el correo como primer paso y lo envía únicamente
-al proveedor como `login_hint`. No lo conserva en `UserDefaults`, SQLite ni
-Keychain. El proveedor decide si continúa con contraseña, código temporal,
-enlace o MFA.
+La puerta de entrada no solicita datos de cuenta. Permite elegir entre
+`Crear cuenta`, que abre directamente el registro con `prompt=create`, e
+`Iniciar sesión`. Nombre, correo y contraseña se capturan una sola vez en
+Identity. No se conservan en `UserDefaults` ni SQLite; Keychain mantiene sólo
+los claims validados necesarios para reconocer la cuenta sin conexión.
 
 La página alojada por Identity permite correo y contraseña y, cuando existen
 credenciales de servidor, acceso con Google o Microsoft. El flujo social
@@ -28,6 +29,12 @@ continúa dentro de la misma autorización PKCE; sus client secrets nunca forman
 parte de la aplicación macOS. Consulta
 [`infrastructure/README.md`](../../infrastructure/README.md) para registrar los
 callbacks.
+
+Las cuentas con contraseña verifican primero el correo con un código de seis
+dígitos. Al habilitarse muestran códigos de recuperación una sola vez. Los
+accesos posteriores requieren contraseña y un nuevo código por correo antes de
+que Identity permita continuar la autorización OIDC. El campo usa el propósito
+`one-time-code`, conserva etiquetas visibles y anuncia errores recuperables.
 
 Después del intercambio, el cliente consulta el endpoint OIDC `userinfo`
 descubierto por el proveedor. Sólo presenta `sub`, nombre y correo después de
@@ -71,9 +78,10 @@ app distribuida, estos valores públicos se incorporarán al `Info.plist` en el
 proceso de build; nunca se incluirá un client secret en el bundle. Los builds
 Release continúan exigiendo HTTPS.
 
-Si el proveedor no está disponible, la entrada ofrece un modo local explícito. Ese modo no
-representa una identidad autenticada y no habilita colaboración ni
-sincronización.
+No existe un modo local anónimo. Si el proveedor no está disponible, la app
+sólo abre el espacio SQLite de una cuenta validada anteriormente en esa Mac. Si
+no hay una sesión conocida, permanece en la puerta de acceso. La sincronización
+remota todavía no forma parte de este corte funcional.
 
 ## Estado de los datos del prototipo
 
