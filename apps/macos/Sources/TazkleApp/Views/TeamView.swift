@@ -91,7 +91,7 @@ struct TeamView: View {
         case "team.pending":
             "Las brechas se detectarán a partir de los roles requeridos por el proyecto y de las personas disponibles."
         default:
-            "Conecta una organización para calcular cobertura, carga y asignaciones. Mientras tanto puedes seguir trabajando en modo local."
+            "Conecta una organización para calcular cobertura, carga y asignaciones dentro de la sesión actual."
         }
     }
 }

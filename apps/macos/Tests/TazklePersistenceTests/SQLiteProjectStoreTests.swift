@@ -5,6 +5,100 @@ import XCTest
 @testable import TazklePersistence
 
 final class SQLiteProjectStoreTests: XCTestCase {
+    func testAccountWorkspaceNamesAreStableSeparatedAndDoNotExposeSubjects() throws {
+        let first = try SQLiteProjectStore.accountDirectoryName(
+            for: "identity|account-a@example.com"
+        )
+        let repeated = try SQLiteProjectStore.accountDirectoryName(
+            for: "identity|account-a@example.com"
+        )
+        let second = try SQLiteProjectStore.accountDirectoryName(
+            for: "identity|account-b@example.com"
+        )
+
+        XCTAssertEqual(first, repeated)
+        XCTAssertNotEqual(first, second)
+        XCTAssertEqual(first.count, 64)
+        XCTAssertFalse(first.contains("account-a"))
+        XCTAssertThrowsError(
+            try SQLiteProjectStore.accountDirectoryName(for: "   ")
+        )
+    }
+
+    func testDeletingAccountWorkspaceRemovesItsCompleteLocalDirectory() throws {
+        let base = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "tazkle-account-deletion-\(UUID().uuidString)",
+                isDirectory: true
+            )
+        defer { try? FileManager.default.removeItem(at: base) }
+
+        let workspaceAccountID = "identity|deleted-account"
+        let accountDirectory = try SQLiteProjectStore.applicationSupportDirectory(
+            workspaceAccountID: workspaceAccountID,
+            applicationSupportBase: base
+        )
+        try FileManager.default.createDirectory(
+            at: accountDirectory,
+            withIntermediateDirectories: true
+        )
+        try Data("project-data".utf8).write(
+            to: accountDirectory.appendingPathComponent("tazkle.sqlite3")
+        )
+
+        try SQLiteProjectStore.deleteApplicationSupport(
+            workspaceAccountID: workspaceAccountID,
+            applicationSupportBase: base
+        )
+
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: accountDirectory.path)
+        )
+    }
+
+    func testDeletingProjectRemovesItsGraphAndPlanningProfile() throws {
+        let context = try makeStore()
+        defer { try? FileManager.default.removeItem(at: context.directory) }
+
+        let graph = ProjectGraph(name: "Marcador sintético")
+        let profile = ProjectPlanningProfile.defaultProfile(for: graph)
+        try context.store.save(graph, template: .blankCanvas)
+        try context.store.savePlanningProfile(profile)
+
+        try context.store.deleteProject(id: graph.id)
+
+        XCTAssertNil(try context.store.loadProject(id: graph.id))
+        XCTAssertNil(try context.store.loadPlanningProfile(projectID: graph.id))
+        XCTAssertTrue(try context.store.listProjects().isEmpty)
+    }
+
+    func testLegacySyntheticPlaceholderIsRemovedOnlyWithExactEmptySignature() throws {
+        let synthetic = try makeStore()
+        defer { try? FileManager.default.removeItem(at: synthetic.directory) }
+
+        let syntheticGraph = ProjectGraph(name: "Proyecto sin nombre")
+        try synthetic.store.save(syntheticGraph, template: .blankCanvas)
+
+        XCTAssertTrue(
+            try synthetic.store.removeLegacySyntheticPlaceholderIfPresent()
+        )
+        XCTAssertTrue(try synthetic.store.listProjects().isEmpty)
+
+        let userProject = try makeStore()
+        defer { try? FileManager.default.removeItem(at: userProject.directory) }
+
+        let userGraph = ProjectGraph(name: "Proyecto sin nombre")
+        try userProject.store.save(userGraph, template: .blankCanvas)
+        try userProject.store.savePlanningProfile(
+            ProjectPlanningProfile.defaultProfile(for: userGraph)
+        )
+
+        XCTAssertFalse(
+            try userProject.store.removeLegacySyntheticPlaceholderIfPresent()
+        )
+        XCTAssertNotNil(try userProject.store.loadProject(id: userGraph.id))
+    }
+
     func testRoundTripPersistsBlocksAndRelations() throws {
         let context = try makeStore()
         defer { try? FileManager.default.removeItem(at: context.directory) }

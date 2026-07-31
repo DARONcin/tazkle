@@ -23,7 +23,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .feasibility: "Factibilidad"
         case .costs: "Costos"
         case .workPlan: "Plan de trabajo"
-        case .settings: "Perfil y configuración"
+        case .settings: "Configuración"
         }
     }
 
@@ -57,7 +57,7 @@ extension AppSection {
         case .feasibility: "Evaluación"
         case .costs: "Desglose de costos"
         case .workPlan: "Vistas del plan"
-        case .settings: "Cuenta y organización"
+        case .settings: "Configuración de cuenta"
         }
     }
 
@@ -111,6 +111,7 @@ extension AppSection {
         case .settings:
             [
                 SectionDestination(id: "settings.profile", title: "Perfil", systemImage: "person.crop.circle"),
+                SectionDestination(id: "settings.security", title: "Seguridad", systemImage: "lock"),
                 SectionDestination(id: "settings.availability", title: "Disponibilidad", systemImage: "calendar.badge.clock"),
                 SectionDestination(id: "settings.notifications", title: "Notificaciones", systemImage: "bell"),
                 SectionDestination(id: "settings.appearance", title: "Apariencia", systemImage: "circle.lefthalf.filled"),
@@ -122,7 +123,6 @@ extension AppSection {
                 SectionDestination(id: "settings.rates", title: "Costos y tarifas", systemImage: "banknote"),
                 SectionDestination(id: "settings.ai", title: "IA", systemImage: "sparkles"),
                 SectionDestination(id: "settings.sync", title: "Sincronización", systemImage: "arrow.triangle.2.circlepath"),
-                SectionDestination(id: "settings.security", title: "Seguridad", systemImage: "lock"),
             ]
         }
     }
@@ -182,6 +182,12 @@ enum WorkspacePanelMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum WorkspaceContentState: Equatable {
+    case loading
+    case empty
+    case project
+}
+
 @MainActor
 final class AppState: ObservableObject {
     @Published var graph: ProjectGraph
@@ -216,25 +222,32 @@ final class AppState: ObservableObject {
     @Published var pendingFamily: BlockFamily = .product
     @Published var lastError: String?
     @Published var saveState: LocalSaveState = .saved
+    @Published private(set) var workspaceContentState: WorkspaceContentState = .loading
+    @Published var isPresentingProductTour = false
 
     private var store: SQLiteProjectStore?
+    private(set) var activeWorkspaceAccountID: String?
     private var memoryProjects: [UUID: ProjectGraph] = [:]
     private var memoryProjectTemplates: [UUID: ProjectTemplateKey] = [:]
     private var memoryProjectUpdatedAt: [UUID: Date] = [:]
     private var memoryPlanningProfiles: [UUID: ProjectPlanningProfile] = [:]
 
     init() {
-        let initialProject = ProjectGraph(name: "Proyecto sin nombre")
+        let initialProject = ProjectGraph(name: "Sin proyecto activo")
         graph = initialProject
         planningProfile = ProjectPlanningProfile.defaultProfile(for: initialProject)
-        memoryProjects[initialProject.id] = initialProject
-        memoryProjectTemplates[initialProject.id] = .blankCanvas
-        memoryProjectUpdatedAt[initialProject.id] = Date()
-        memoryPlanningProfiles[initialProject.id] = planningProfile
+    }
 
+    func activateWorkspace(for workspaceAccountID: String) {
+        guard activeWorkspaceAccountID != workspaceAccountID else { return }
+        replaceWorkspaceWithPlaceholder(state: .loading)
+        activeWorkspaceAccountID = workspaceAccountID
         do {
-            let localStore = try SQLiteProjectStore.applicationSupport()
+            let localStore = try SQLiteProjectStore.applicationSupport(
+                workspaceAccountID: workspaceAccountID
+            )
             store = localStore
+            try localStore.removeLegacySyntheticPlaceholderIfPresent()
             if let latest = try localStore.listProjects().first,
                var saved = try localStore.loadProject(id: latest.id) {
                 selectedProjectTemplate = latest.template
@@ -243,22 +256,49 @@ final class AppState: ObservableObject {
                 if changed {
                     try localStore.save(saved, template: latest.template)
                 }
+                planningProfile = try localStore.loadPlanningProfile(projectID: graph.id)
+                    ?? ProjectPlanningProfile.defaultProfile(for: graph)
+                clearMemoryProjects()
+                rememberCurrentProject()
+                try refreshAvailableProjects()
+                workspaceContentState = .project
             } else {
-                try localStore.save(initialProject, template: .blankCanvas)
+                clearMemoryProjects()
+                availableProjects = []
+                workspaceContentState = .empty
             }
-            planningProfile = try localStore.loadPlanningProfile(projectID: graph.id)
-                ?? ProjectPlanningProfile.defaultProfile(for: graph)
-            memoryProjects.removeAll()
-            memoryProjectTemplates.removeAll()
-            memoryProjectUpdatedAt.removeAll()
-            memoryPlanningProfiles.removeAll()
-            rememberCurrentProject()
-            try refreshAvailableProjects()
+            saveState = .saved
         } catch {
             store = nil
-            refreshAvailableProjectsFromMemory()
-            lastError = "El mapa está disponible, pero no se pudo activar la persistencia local. \(error.localizedDescription)"
+            clearMemoryProjects()
+            availableProjects = []
+            workspaceContentState = .empty
+            lastError = "No se pudo abrir el espacio local de esta cuenta. \(error.localizedDescription)"
             saveState = .failed
+        }
+    }
+
+    func deactivateWorkspace() {
+        guard activeWorkspaceAccountID != nil || store != nil else { return }
+        store = nil
+        activeWorkspaceAccountID = nil
+        replaceWorkspaceWithPlaceholder(state: .loading)
+    }
+
+    func deleteWorkspace(for workspaceAccountID: String) throws {
+        if activeWorkspaceAccountID == workspaceAccountID {
+            store = nil
+            activeWorkspaceAccountID = nil
+            replaceWorkspaceWithPlaceholder(state: .loading)
+        }
+        do {
+            try SQLiteProjectStore.deleteApplicationSupport(
+                workspaceAccountID: workspaceAccountID
+            )
+            lastError = nil
+        } catch {
+            lastError = "La cuenta se eliminó, pero no fue posible borrar su copia local. \(error.localizedDescription)"
+            throw error
         }
     }
 
@@ -288,14 +328,23 @@ final class AppState: ObservableObject {
     }
 
     var planningAssessment: ProjectPlanningAssessment? {
-        try? ProjectPlanningEngine.assess(
+        guard hasActiveProject else { return nil }
+        return try? ProjectPlanningEngine.assess(
             graph: graph,
             profile: planningProfile
         )
     }
 
+    var hasActiveProject: Bool {
+        workspaceContentState == .project
+    }
+
     func presentNewProject() {
         isPresentingNewProject = true
+    }
+
+    func presentProductTour() {
+        isPresentingProductTour = true
     }
 
     @discardableResult
@@ -330,6 +379,7 @@ final class AppState: ObservableObject {
             try refreshAvailableProjects()
             resetWorkspaceForProjectChange()
             isPresentingNewProject = false
+            workspaceContentState = .project
             saveState = store == nil ? .failed : .saved
             return true
         } catch {
@@ -376,6 +426,7 @@ final class AppState: ObservableObject {
                 try refreshAvailableProjects()
             }
             resetWorkspaceForProjectChange()
+            workspaceContentState = .project
             saveState = store == nil ? .failed : .saved
         } catch {
             lastError = "No se pudo abrir el proyecto. \(error.localizedDescription)"
@@ -885,6 +936,7 @@ final class AppState: ObservableObject {
     }
 
     private func persistGraph() {
+        guard hasActiveProject else { return }
         rememberCurrentProject()
         guard let store else {
             saveState = .failed
@@ -929,6 +981,26 @@ final class AppState: ObservableObject {
                 )
             }
             .sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    private func replaceWorkspaceWithPlaceholder(state: WorkspaceContentState) {
+        let placeholder = ProjectGraph(name: "Sin proyecto activo")
+        graph = placeholder
+        planningProfile = ProjectPlanningProfile.defaultProfile(for: placeholder)
+        selectedProjectTemplate = .blankCanvas
+        clearMemoryProjects()
+        availableProjects = []
+        workspaceContentState = state
+        lastError = nil
+        saveState = .saved
+        resetWorkspaceForProjectChange()
+    }
+
+    private func clearMemoryProjects() {
+        memoryProjects.removeAll()
+        memoryProjectTemplates.removeAll()
+        memoryProjectUpdatedAt.removeAll()
+        memoryPlanningProfiles.removeAll()
     }
 
     private func resetWorkspaceForProjectChange() {

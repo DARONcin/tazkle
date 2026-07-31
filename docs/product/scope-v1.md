@@ -81,10 +81,22 @@ Un equipo puede convertir una idea de aplicación web en un proyecto coherente, 
 - El perfil se persiste en SQLite por proyecto y continúa disponible sin
   conexión.
 - El cliente OIDC de macOS implementa acceso con correo, PKCE, Keychain y lectura
-  segura de `userinfo`; falta configurar un proveedor real y confirmar el flujo
-  de extremo a extremo.
-- Una base local nueva parte de un proyecto vacío. Cuenta, organización y equipo
-  no fabrican personas, roles, costos ni capacidad mientras Project Core no
+  segura de `userinfo`. Identity exige verificación del correo y segundo factor
+  OTP para cuentas con contraseña; la entrega real a una bandeja autorizada y
+  el recorrido completo permanecen pendientes de revalidación manual.
+- No existe entrada local anónima. El trabajo offline requiere una sesión
+  previamente validada y se persiste en un SQLite separado por emisor + `sub`
+  OIDC para impedir que dos cuentas mezclen o importen proyectos
+  implícitamente.
+- Perfil y seguridad permiten cerrar sesión o iniciar una eliminación
+  irreversible como acciones distintas. La eliminación exige conexión, doble
+  confirmación, reautenticación de la misma identidad y borra la cuenta, sus
+  sesiones y el SQLite asociado en la Mac.
+- Una base local nueva parte de una bienvenida sin proyecto activo. La persona
+  puede crear su primer proyecto o recorrer el producto; el SQLite no recibe un
+  proyecto hasta confirmar el asistente. Cuenta, organización y equipo no
+  fabrican personas, roles, costos ni capacidad mientras Project Core no
   entregue esos datos.
-- Sincronización remota, aprobación y proveedor de IA permanecen fuera de este
-  corte.
+- Sincronización remota con Project Core, aprobación y proveedor de IA
+  permanecen fuera de este corte; por ahora los cambios offline quedan
+  preservados localmente, no confirmados como sincronizados.

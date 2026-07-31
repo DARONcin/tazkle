@@ -42,7 +42,7 @@ struct SidebarView: View {
             }
 
             Divider()
-            ProfileAccessCard()
+            ConfigurationAccessCard()
         }
     }
 }
@@ -111,7 +111,7 @@ private struct ContextualNavigationView: View {
     }
 }
 
-private struct ProfileAccessCard: View {
+private struct ConfigurationAccessCard: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var authentication: AuthenticationController
 
@@ -120,16 +120,16 @@ private struct ProfileAccessCard: View {
             appState.selectSection(.settings)
         } label: {
             HStack(spacing: TazkleSpacing.medium) {
-                Image(systemName: identitySystemImage)
+                Image(systemName: "gearshape")
                     .font(.title2)
-                    .foregroundStyle(TazkleColors.assistantProposal)
+                    .foregroundStyle(TazkleColors.actionPrimary)
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(identityTitle)
+                    Text("Configuración")
                         .font(.callout.weight(.semibold))
                         .lineLimit(1)
-                    Text(identityDetail)
+                    Text(identityTitle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -155,9 +155,9 @@ private struct ProfileAccessCard: View {
         .buttonStyle(.plain)
         .padding(.horizontal, TazkleSpacing.medium)
         .padding(.vertical, TazkleSpacing.small)
-        .accessibilityLabel("Perfil y configuración")
+        .accessibilityLabel("Configuración")
         .accessibilityValue("\(identityTitle), \(identityDetail)")
-        .accessibilityHint("Abre el perfil y las preferencias de Tazkle")
+        .accessibilityHint("Abre perfil, seguridad y preferencias de Tazkle")
         .accessibilityAddTraits(appState.selectedSection == .settings ? .isSelected : [])
     }
 
@@ -166,7 +166,6 @@ private struct ProfileAccessCard: View {
             return user.displayName
         }
         return switch authentication.state {
-        case .localOnly: "Espacio local"
         case .offline: "Sesión sin conexión"
         default: "Cuenta de Tazkle"
         }
@@ -177,19 +176,9 @@ private struct ProfileAccessCard: View {
             return email
         }
         return switch authentication.state {
-        case .localOnly: "Sin cuenta conectada"
-        case .offline: "Identidad no disponible"
+        case .offline: "Identidad validada en esta Mac"
         case .authenticated: "Identidad conectada"
         default: "Configurar acceso"
-        }
-    }
-
-    private var identitySystemImage: String {
-        switch authentication.state {
-        case .authenticated: "person.crop.circle.badge.checkmark"
-        case .offline: "person.crop.circle.badge.exclamationmark"
-        case .localOnly: "internaldrive"
-        default: "person.crop.circle"
         }
     }
 }

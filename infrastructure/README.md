@@ -35,6 +35,38 @@ npm run test:domain:docker
 Esta prueba crea datos desechables y comprueba idempotencia y aislamiento entre
 organizaciones. Better Auth emite localmente los tokens que Gateway valida.
 
+## Correo y segundo factor
+
+Identity usa Resend para verificar el correo y enviar el segundo factor. Agrega
+una clave con permiso exclusivo de envío y un remitente seguro:
+
+```dotenv
+TAZKLE_RESEND_API_KEY=re_...
+TAZKLE_AUTH_EMAIL_FROM=Tazkle <onboarding@resend.dev>
+```
+
+El remitente de desarrollo sólo permite entregar al correo propietario de la
+cuenta de Resend. Para otras personas se requiere un dominio verificado y un
+remitente de ese dominio.
+
+La clave se convierte en un archivo `0600` y sólo se monta en Identity.
+Identity conserva salida HTTPS para Resend, pero no publica su puerto. Gateway
+sigue siendo la única entrada HTTP.
+
+El registro exige un OTP de seis dígitos antes de activar la cuenta. Después
+presenta ocho códigos de recuperación. Los accesos con contraseña posteriores
+exigen otro OTP; la interfaz no marca esta Mac como confiable automáticamente.
+
+La comprobación interactiva requiere un destinatario autorizado y solicita el
+OTP directamente en la terminal:
+
+```bash
+TAZKLE_SMOKE_EMAIL=tu-correo@example.com npm run test:identity:local
+```
+
+No uses una cuenta real compartida en CI. Las pruebas automatizadas sustituyen
+el transporte de correo y nunca requieren una clave de Resend.
+
 ## Google y Microsoft
 
 Los providers sociales son opcionales y se activan únicamente con un par de
@@ -72,11 +104,12 @@ se montan en Identity; no llegan al Gateway ni al cliente macOS.
   sólo lectura y sin publicar puertos internos.
 - El PostgreSQL local activa replicación lógica para preparar la evaluación de
   PowerSync, pero PowerSync todavía no se conecta.
-- Neon administrado, correo transaccional, R2, cola y proveedor de IA requieren
-  configuración externa y no se simulan como operativos.
-- El acceso por correo y contraseña está habilitado, pero la propiedad del
-  correo no se marca como verificada hasta integrar un servicio transaccional.
-  Google y Microsoft conservan la verificación que entregue su identidad; ese
+- Neon administrado, R2, cola y proveedor de IA requieren configuración externa
+  y no se simulan como operativos.
+- El envío transaccional está conectado a Resend. La migración y el servicio se
+  validan localmente, pero la entrega a una bandeja real requiere una prueba
+  manual con un destinatario autorizado.
+- Google y Microsoft conservan la verificación que entregue su identidad; ese
   indicador nunca se inventa localmente.
 
 No se almacenan secretos. `infrastructure/.env.local` permanece ignorado.

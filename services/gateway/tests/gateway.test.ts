@@ -155,10 +155,18 @@ test("gateway turns Better Auth browser navigation JSON into a bounded redirect"
     accessTokens,
     internalActors,
     fetchImplementation: async () => {
-      return Response.json({
-        redirect: true,
-        url: "/sign-in?client_id=tazkle-macos&sig=signed",
-      });
+      return Response.json(
+        {
+          redirect: true,
+          url: "/sign-in?client_id=tazkle-macos&sig=signed",
+        },
+        {
+          headers: {
+            "Set-Cookie":
+              "tazkle.oauth_state=signed; HttpOnly; SameSite=Lax",
+          },
+        },
+      );
     },
   });
 
@@ -172,6 +180,10 @@ test("gateway turns Better Auth browser navigation JSON into a bounded redirect"
   assert.equal(
     response.headers.get("location"),
     "/sign-in?client_id=tazkle-macos&sig=signed",
+  );
+  assert.match(
+    response.headers.get("set-cookie") ?? "",
+    /tazkle\.oauth_state=signed/,
   );
 });
 
@@ -329,6 +341,133 @@ test("gateway rejects unknown project properties before Project Core", async () 
       name: "Portal",
       templateKey: "web-application",
       responsibleUserId: "550e8400-e29b-41d4-a716-446655440099",
+    }),
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal(internalCalls, 0);
+});
+
+const projectId = "550e8400-e29b-41d4-a716-446655440000";
+const emptyGraph = { graph: { blocks: [], relations: [] }, rowVersion: 1, replayed: false };
+
+test("gateway forwards a project graph read to the scoped project path", async () => {
+  let target = "";
+  const app = createGatewayApp({
+    urls,
+    accessTokens,
+    internalActors,
+    fetchImplementation: async (input) => {
+      target = input.toString();
+      return Response.json(emptyGraph);
+    },
+  });
+
+  const response = await app.request(`/v1/projects/${projectId}/graph`, {
+    headers: {
+      Accept: "application/json",
+      Authorization: "Bearer external.payload.signature",
+    },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(
+    target,
+    `http://project-core.test/internal/v1/projects/${projectId}/graph`,
+  );
+  assert.deepEqual(await response.json(), emptyGraph);
+});
+
+test("gateway forwards a validated graph replace with its idempotency key", async () => {
+  let forwardedIdempotencyKey = "";
+  let forwardedBody = "";
+  const app = createGatewayApp({
+    urls,
+    accessTokens,
+    internalActors,
+    fetchImplementation: async (input, init) => {
+      const url = new URL(input.toString());
+      assert.equal(url.pathname, `/internal/v1/projects/${projectId}/graph`);
+      const headers = new Headers(init?.headers);
+      forwardedIdempotencyKey = headers.get("Idempotency-Key") ?? "";
+      forwardedBody = String(init?.body);
+      return Response.json(
+        { graph: { blocks: [], relations: [] }, rowVersion: 2, replayed: false },
+        { status: 201 },
+      );
+    },
+  });
+
+  const command = {
+    expectedRowVersion: 1,
+    graph: { blocks: [], relations: [] },
+  };
+
+  const response = await app.request(`/v1/projects/${projectId}/graph`, {
+    method: "PUT",
+    headers: {
+      Accept: "application/json",
+      Authorization: "Bearer external.payload.signature",
+      "Content-Type": "application/json",
+      "Idempotency-Key": "graph-replace-0001",
+    },
+    body: JSON.stringify(command),
+  });
+
+  assert.equal(response.status, 201);
+  assert.equal(forwardedIdempotencyKey, "graph-replace-0001");
+  assert.deepEqual(JSON.parse(forwardedBody), command);
+});
+
+test("gateway rejects a graph replace with a self-relation before Project Core", async () => {
+  let internalCalls = 0;
+  const app = createGatewayApp({
+    urls,
+    accessTokens,
+    internalActors,
+    fetchImplementation: async () => {
+      internalCalls += 1;
+      throw new Error("must not be called");
+    },
+  });
+
+  const blockId = "550e8400-e29b-41d4-a716-446655440003";
+  const response = await app.request(`/v1/projects/${projectId}/graph`, {
+    method: "PUT",
+    headers: {
+      Accept: "application/json",
+      Authorization: "Bearer external.payload.signature",
+      "Content-Type": "application/json",
+      "Idempotency-Key": "graph-replace-0002",
+    },
+    body: JSON.stringify({
+      expectedRowVersion: 1,
+      graph: {
+        blocks: [
+          {
+            id: blockId,
+            title: "API",
+            summary: "",
+            family: "technology",
+            state: "draft",
+            architectureLayer: null,
+            position: { x: 0, y: 0 },
+            rowVersion: 1,
+          },
+        ],
+        relations: [
+          {
+            id: "550e8400-e29b-41d4-a716-446655440004",
+            sourceId: blockId,
+            targetId: blockId,
+            sourcePort: "right",
+            targetPort: "left",
+            type: "requires",
+            isCritical: false,
+            rowVersion: 1,
+          },
+        ],
+      },
     }),
   });
 

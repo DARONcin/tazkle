@@ -116,6 +116,188 @@ export const projectListResponseSchema = z
 
 export type ProjectListResponse = z.infer<typeof projectListResponseSchema>;
 
+export const blockFamilySchema = z.enum([
+  "strategy",
+  "product",
+  "process",
+  "technology",
+  "people",
+  "economy",
+  "governance",
+]);
+
+export const blockStateSchema = z.enum([
+  "draft",
+  "ready",
+  "warning",
+  "approved",
+]);
+
+export const architectureLayerSchema = z.enum([
+  "experience",
+  "services",
+  "data",
+  "infrastructure",
+]);
+
+export const connectionPortSchema = z.enum([
+  "top",
+  "right",
+  "bottom",
+  "left",
+]);
+
+export const relationTypeSchema = z.enum([
+  "contains",
+  "dependsOn",
+  "implements",
+  "requires",
+  "produces",
+  "validates",
+  "assigns",
+  "finances",
+  "blocks",
+]);
+
+function hasControlCharacters(value: string): boolean {
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (codePoint < 0x20 || codePoint === 0x7f) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export const blockSchema = z
+  .object({
+    id: z.string().uuid(),
+    title: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .refine((value) => !hasControlCharacters(value), {
+        message: "El texto incluye caracteres de control no permitidos.",
+      }),
+    summary: z
+      .string()
+      .max(500)
+      .refine((value) => !hasControlCharacters(value), {
+        message: "El texto incluye caracteres de control no permitidos.",
+      }),
+    family: blockFamilySchema,
+    state: blockStateSchema,
+    architectureLayer: architectureLayerSchema.nullable(),
+    position: z
+      .object({
+        x: z.number().finite().min(-1_000_000).max(1_000_000),
+        y: z.number().finite().min(-1_000_000).max(1_000_000),
+      })
+      .strict(),
+    rowVersion: z.number().int().positive(),
+  })
+  .strict();
+
+export type ProjectBlock = z.infer<typeof blockSchema>;
+
+export const relationSchema = z
+  .object({
+    id: z.string().uuid(),
+    sourceId: z.string().uuid(),
+    targetId: z.string().uuid(),
+    sourcePort: connectionPortSchema,
+    targetPort: connectionPortSchema,
+    type: relationTypeSchema,
+    isCritical: z.boolean(),
+    rowVersion: z.number().int().positive(),
+  })
+  .strict()
+  .refine((relation) => relation.sourceId !== relation.targetId, {
+    message: "Un bloque no puede relacionarse consigo mismo.",
+    path: ["targetId"],
+  });
+
+export type ProjectRelation = z.infer<typeof relationSchema>;
+
+export const projectGraphSchema = z
+  .object({
+    blocks: z.array(blockSchema).max(500),
+    relations: z.array(relationSchema).max(1_000),
+  })
+  .strict()
+  .superRefine((graph, ctx) => {
+    const blockIds = new Set<string>();
+    for (const block of graph.blocks) {
+      if (blockIds.has(block.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Dos bloques comparten el mismo identificador.",
+          path: ["blocks"],
+        });
+        return;
+      }
+      blockIds.add(block.id);
+    }
+
+    const relationIds = new Set<string>();
+    const semanticRelations = new Set<string>();
+    for (const relation of graph.relations) {
+      if (relationIds.has(relation.id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Dos relaciones comparten el mismo identificador.",
+          path: ["relations"],
+        });
+        return;
+      }
+      relationIds.add(relation.id);
+
+      if (!blockIds.has(relation.sourceId) || !blockIds.has(relation.targetId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "La relación apunta a un bloque inexistente.",
+          path: ["relations"],
+        });
+        return;
+      }
+
+      const semanticKey = `${relation.sourceId}|${relation.type}|${relation.targetId}`;
+      if (semanticRelations.has(semanticKey)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Esta relación ya existe.",
+          path: ["relations"],
+        });
+        return;
+      }
+      semanticRelations.add(semanticKey);
+    }
+  });
+
+export type ProjectGraph = z.infer<typeof projectGraphSchema>;
+
+export const replaceProjectGraphCommandSchema = z
+  .object({
+    expectedRowVersion: z.number().int().positive(),
+    graph: projectGraphSchema,
+  })
+  .strict();
+
+export type ReplaceProjectGraphCommand = z.infer<
+  typeof replaceProjectGraphCommandSchema
+>;
+
+export const projectGraphResponseSchema = z
+  .object({
+    graph: projectGraphSchema,
+    rowVersion: z.number().int().positive(),
+    replayed: z.boolean(),
+  })
+  .strict();
+
+export type ProjectGraphResponse = z.infer<typeof projectGraphResponseSchema>;
+
 export const externalActorSchema = z
   .object({
     issuer: z.string().url().max(512),

@@ -1,14 +1,18 @@
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
+import { createInterface } from "node:readline/promises";
 
 const origin = process.env.TAZKLE_SMOKE_ORIGIN ?? "http://127.0.0.1:8787";
 const issuer = `${origin}/api/auth`;
 const clientID = "tazkle-macos";
 const redirectURI = "app.tazkle.desktop:/oauth/callback";
 const resource = "tazkle-local";
-const email =
-  process.env.TAZKLE_SMOKE_EMAIL ??
-  `auth-smoke-${Date.now()}@example.invalid`;
+const email = process.env.TAZKLE_SMOKE_EMAIL;
+if (!email) {
+  throw new Error(
+    "TAZKLE_SMOKE_EMAIL is required; use an address authorized by the configured email provider",
+  );
+}
 const password =
   process.env.TAZKLE_SMOKE_PASSWORD ??
   `Smoke-${randomBytes(18).toString("base64url")}`;
@@ -80,7 +84,57 @@ const signUp = await request(`${origin}/api/auth/sign-up/email`, {
   }),
 });
 const signUpPayload = await checkedJSON(signUp, 200);
-assert.equal(typeof signUpPayload.url, "string");
+assert.equal(signUpPayload.user.email, email);
+assert.equal(signUpPayload.user.emailVerified, false);
+
+await checkedJSON(
+  await request(
+    `${origin}/api/auth/email-otp/send-verification-otp`,
+    {
+      method: "POST",
+      headers: jsonHeaders(),
+      body: JSON.stringify({
+        email,
+        type: "email-verification",
+      }),
+    },
+  ),
+  200,
+);
+
+const emailOTP = await verificationCode(
+  "TAZKLE_SMOKE_EMAIL_OTP",
+  "Código de verificación enviado por correo: ",
+);
+const verification = await request(
+  `${origin}/api/auth/email-otp/verify-email`,
+  {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({
+      email,
+      otp: emailOTP,
+    }),
+  },
+);
+const verificationPayload = await checkedJSON(verification, 200);
+assert.equal(verificationPayload.status, true);
+assert.equal(verificationPayload.user.emailVerified, true);
+
+const enableTwoFactor = await request(
+  `${origin}/api/auth/two-factor/enable`,
+  {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({
+      password,
+      issuer: "Tazkle",
+    }),
+  },
+);
+const enrollment = await checkedJSON(enableTwoFactor, 200);
+assert.equal(enrollment.backupCodes.length, 8);
+
 const continueSignUp = await request(`${origin}/api/auth/oauth2/continue`, {
   method: "POST",
   headers: jsonHeaders(),
@@ -162,11 +216,40 @@ assert.equal(refreshed.access_token.split(".").length, 3);
 console.info(
   JSON.stringify({
     status: "ok",
-    flow: "email-signup-pkce-consent-token-userinfo-refresh",
-    email,
+    flow: "email-verification-2fa-enrollment-pkce-consent-token-userinfo-refresh",
+    email: maskEmail(email),
     emailVerified: userInfo.email_verified === true,
   }),
 );
+
+async function verificationCode(environmentName, prompt) {
+  const configured = process.env[environmentName]?.trim();
+  if (configured) {
+    assert.match(configured, /^\d{6}$/);
+    return configured;
+  }
+  if (!process.stdin.isTTY) {
+    throw new Error(
+      `${environmentName} is required when stdin is not interactive`,
+    );
+  }
+  const terminal = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  try {
+    const value = (await terminal.question(prompt)).trim();
+    assert.match(value, /^\d{6}$/);
+    return value;
+  } finally {
+    terminal.close();
+  }
+}
+
+function maskEmail(value) {
+  const [name, domain] = value.split("@");
+  return `${name.slice(0, 2)}•••@${domain}`;
+}
 
 async function request(input, init) {
   const headers = new Headers(init?.headers);

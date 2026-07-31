@@ -195,6 +195,7 @@ private struct CostsDashboardView: View {
                 Text("Interno alto").tag("Alto")
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
 
             let selectedValue: Int = switch scenario {
             case "Bajo": assessment.internalCost.lowerBound

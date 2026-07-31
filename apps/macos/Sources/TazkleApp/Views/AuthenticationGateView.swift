@@ -4,6 +4,7 @@ import TazkleDesignSystem
 
 struct AuthenticationGateView: View {
     @EnvironmentObject private var authentication: AuthenticationController
+    @EnvironmentObject private var appState: AppState
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -82,6 +83,28 @@ struct AuthenticationGateView: View {
 
             stateNotice
 
+            if authentication.hasPendingLocalAccountCleanup {
+                Button {
+                    authentication.retryPendingLocalAccountCleanup {
+                        workspaceAccountID in
+                        try appState.deleteWorkspace(
+                            for: workspaceAccountID
+                        )
+                    }
+                } label: {
+                    Label(
+                        "Eliminar datos locales pendientes",
+                        systemImage: "trash"
+                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, TazkleSpacing.small)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityHint(
+                    "Vuelve a intentar eliminar de esta Mac la copia de la cuenta que ya se borró del servidor."
+                )
+            }
+
             VStack(spacing: TazkleSpacing.medium) {
                 Button(action: beginSignUp) {
                     HStack {
@@ -146,22 +169,10 @@ struct AuthenticationGateView: View {
                     )
                 }
 
-                Button {
-                    authentication.continueLocally()
-                } label: {
-                    Label("Continuar sólo en esta Mac", systemImage: "internaldrive")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, TazkleSpacing.small)
-                }
-                .buttonStyle(.bordered)
-                .disabled(authentication.state == .restoring)
-                .accessibilityHint(
-                    "Cancela cualquier acceso pendiente y abre los proyectos locales sin sincronización ni colaboración."
-                )
             }
 
             Label(
-                "Tus datos se escriben una sola vez en el proveedor de identidad",
+                "Se requiere una sesión validada; después podrás trabajar sin conexión",
                 systemImage: "lock.shield"
             )
             .font(.caption)
@@ -191,44 +202,53 @@ struct AuthenticationGateView: View {
 
     @ViewBuilder
     private var stateNotice: some View {
-        switch authentication.state {
-        case .configurationRequired:
+        if let accountFailure = authentication.accountDeletionFailure {
             AccessNotice(
-                title: "Proveedor pendiente de configurar",
-                detail: "Puedes trabajar localmente. El acceso remoto se habilitará al registrar el cliente OIDC de Tazkle.",
-                systemImage: "wrench.and.screwdriver",
-                color: TazkleColors.warning
-            )
-        case .failed(let failure):
-            AccessNotice(
-                title: "No se completó el acceso",
-                detail: failure.userMessage,
+                title: "Revisa la seguridad de esta Mac",
+                detail: accountFailure.userMessage,
                 systemImage: "exclamationmark.triangle",
                 color: TazkleColors.warning
             )
-        case .restoring:
-            AccessNotice(
-                title: "Restaurando sesión",
-                detail: "Validando la credencial guardada de forma segura en esta Mac.",
-                systemImage: "arrow.triangle.2.circlepath",
-                color: TazkleColors.assistantProposal
-            )
-        case .authorizing:
-            AccessNotice(
-                title: "Completa el acceso en el navegador",
-                detail: "Escribe ahí tus datos una sola vez. Si cerraste la ventana, cancela este intento para comenzar otro.",
-                systemImage: "safari",
-                color: TazkleColors.assistantProposal
-            )
-        default:
-            EmptyView()
+        } else {
+            switch authentication.state {
+            case .configurationRequired:
+                AccessNotice(
+                    title: "Proveedor pendiente de configurar",
+                    detail: "Tazkle necesita un proveedor OIDC válido antes de abrir cualquier proyecto.",
+                    systemImage: "wrench.and.screwdriver",
+                    color: TazkleColors.warning
+                )
+            case .failed(let failure):
+                AccessNotice(
+                    title: "No se completó el acceso",
+                    detail: failure.userMessage,
+                    systemImage: "exclamationmark.triangle",
+                    color: TazkleColors.warning
+                )
+            case .restoring:
+                AccessNotice(
+                    title: "Restaurando sesión",
+                    detail: "Validando la credencial guardada de forma segura en esta Mac.",
+                    systemImage: "arrow.triangle.2.circlepath",
+                    color: TazkleColors.assistantProposal
+                )
+            case .authorizing:
+                AccessNotice(
+                    title: "Completa el acceso en el navegador",
+                    detail: "Escribe ahí tus datos una sola vez. Si cerraste la ventana, cancela este intento para comenzar otro.",
+                    systemImage: "safari",
+                    color: TazkleColors.assistantProposal
+                )
+            default:
+                EmptyView()
+            }
         }
     }
 
     private var accessSubtitle: String {
         authentication.configuration == nil
-            ? "Conecta tu identidad para colaborar o entra en modo local."
-            : "Elige una opción. Los datos de tu cuenta se capturan únicamente en la ventana segura."
+            ? "Configura el proveedor de identidad para iniciar una sesión."
+            : "Tu cuenta identifica el espacio local y evita mezclar proyectos entre sesiones."
     }
 
     private var primaryActionTitle: String {

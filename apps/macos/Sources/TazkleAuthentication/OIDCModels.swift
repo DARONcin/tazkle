@@ -173,6 +173,10 @@ public enum AuthenticationFailure: Error, Equatable, Sendable {
     case cancelled
     case sessionExpired
     case credentialStorage
+    case accountDeletionRequiresOnlineSession
+    case accountDeletionIdentityMismatch
+    case accountDeletionFailed
+    case localAccountCleanupFailed
 
     public var userMessage: String {
         switch self {
@@ -190,6 +194,14 @@ public enum AuthenticationFailure: Error, Equatable, Sendable {
             "La sesión terminó. Inicia sesión nuevamente para sincronizar."
         case .credentialStorage:
             "La credencial no pudo guardarse de forma segura en Keychain."
+        case .accountDeletionRequiresOnlineSession:
+            "Conéctate e inicia una sesión válida antes de eliminar la cuenta."
+        case .accountDeletionIdentityMismatch:
+            "La cuenta verificada no coincide con la sesión de Tazkle. No se eliminó ninguna cuenta."
+        case .accountDeletionFailed:
+            "La cuenta no pudo eliminarse. No se borraron los datos locales."
+        case .localAccountCleanupFailed:
+            "La cuenta remota se eliminó, pero esta Mac conserva su copia local. Intenta borrar nuevamente los datos locales."
         }
     }
 }
@@ -305,6 +317,7 @@ public struct SafeEmailAddress: Equatable, Sendable {
 enum AccountAuthorizationIntent: Equatable, Sendable {
     case signIn
     case signUp
+    case reauthenticate
 }
 
 public enum AuthenticationState: Equatable, Sendable {
@@ -314,12 +327,11 @@ public enum AuthenticationState: Equatable, Sendable {
     case authorizing
     case authenticated(RemoteSession)
     case offline
-    case localOnly
     case failed(AuthenticationFailure)
 
     public var permitsWorkspace: Bool {
         switch self {
-        case .authenticated, .offline, .localOnly:
+        case .authenticated, .offline:
             true
         default:
             false

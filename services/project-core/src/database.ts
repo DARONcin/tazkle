@@ -1,6 +1,7 @@
 import type { DependencyStatus } from "@tazkle/platform-contracts";
 import { readSecretValue } from "@tazkle/service-kit";
 import { Pool, type PoolConfig } from "pg";
+import { createPostgresGraphRepository, type GraphRepository } from "./graph.js";
 import {
   createPostgresProjectRepository,
   type ProjectRepository,
@@ -10,6 +11,7 @@ export type DatabaseConnection = {
   probe: () => Promise<DependencyStatus[]>;
   close: () => Promise<void>;
   projects: ProjectRepository;
+  graph: GraphRepository;
 };
 
 export function createDatabaseConnection(
@@ -32,6 +34,10 @@ export function createDatabaseConnection(
       projects: {
         create: unavailable,
         list: unavailable,
+      },
+      graph: {
+        get: unavailable,
+        replace: unavailable,
       },
     };
   }
@@ -63,6 +69,7 @@ export function createDatabaseConnection(
       await pool.end();
     },
     projects: createPostgresProjectRepository(pool),
+    graph: createPostgresGraphRepository(pool),
   };
 }
 

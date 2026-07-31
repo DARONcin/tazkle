@@ -56,6 +56,48 @@ export function consentPage(search: string): IdentityPage {
   };
 }
 
+export function deleteAccountPage(search: string): IdentityPage {
+  const nonce = randomBytes(18).toString("base64");
+  const parameters = new URLSearchParams(normalizedQuery(search));
+  const callback = validatedAccountDeletionCallback(
+    parameters.get("callback")
+  );
+  const state = validatedAccountDeletionState(parameters.get("state"));
+  const requestIsValid = callback !== undefined && state !== undefined;
+
+  return {
+    contentSecurityPolicy: contentSecurityPolicy(nonce),
+    body: documentShell({
+      title: "Eliminar cuenta",
+      nonce,
+      content: `
+        <main class="auth-shell">
+          ${brandMark()}
+          <section class="auth-card danger-card" aria-labelledby="page-title">
+            <p class="eyebrow danger-text">Acción irreversible</p>
+            <h1 id="page-title">Eliminar cuenta de Tazkle</h1>
+            <p class="lead">Se cerrarán todas tus sesiones y la aplicación eliminará de esta Mac el espacio local asociado.</p>
+            ${
+              requestIsValid
+                ? `<form id="delete-account-form">
+                    <input type="hidden" name="callback" value="${escapeAttribute(callback)}" />
+                    <input type="hidden" name="state" value="${escapeAttribute(state)}" />
+                    <label for="confirmation">Escribe ELIMINAR para confirmar</label>
+                    <input id="confirmation" name="confirmation" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="8" required autofocus />
+                    <p class="field-help">Tazkle verificó nuevamente tu cuenta antes de abrir esta confirmación. Si la ventana expira, ciérrala y repite la operación.</p>
+                    <button id="delete-account-button" class="button danger" type="submit" disabled>Eliminar permanentemente</button>
+                  </form>`
+                : `<p class="status" role="alert">La solicitud de eliminación no es válida. Cierra esta ventana y vuelve a intentarlo desde Tazkle.</p>`
+            }
+            <p id="status" class="status" role="status" aria-live="assertive" aria-atomic="true" hidden></p>
+          </section>
+        </main>
+      `,
+      scriptSource: "/identity/client/delete-account.js",
+    }),
+  };
+}
+
 function accountPage(
   mode: "signin" | "signup",
   search: string,
@@ -103,12 +145,26 @@ function accountPage(
                   ? `<p class="field-help">Usa al menos 12 caracteres. Tazkle nunca recibe esta contraseña en la app de macOS.</p>`
                   : ""
               }
-              <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true" hidden></p>
               <button class="button primary" type="submit">${submitText}</button>
             </form>
+            <form id="otp-form" hidden>
+              <p id="otp-instructions" class="step-copy"></p>
+              <label for="otp">Código de seguridad</label>
+              <input id="otp" name="otp" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required />
+              <p class="field-help">El código tiene 6 dígitos, caduca en 5 minutos y sólo puede utilizarse una vez.</p>
+              <button class="button primary" type="submit">Verificar código</button>
+              <button id="resend-code" class="button secondary" type="button">Enviar un código nuevo</button>
+            </form>
+            <section id="recovery-step" aria-labelledby="recovery-title" hidden>
+              <h2 id="recovery-title">Guarda tus códigos de recuperación</h2>
+              <p class="step-copy">Son la única alternativa si pierdes el acceso a tu correo. Cada código funciona una sola vez.</p>
+              <ul id="recovery-codes" class="recovery-codes" aria-label="Códigos de recuperación"></ul>
+              <button id="finish-enrollment" class="button primary" type="button">Ya guardé mis códigos</button>
+            </section>
+            <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true" hidden></p>
             <a class="alternate" href="${escapeAttribute(alternateURL)}">${alternateText}</a>
           </section>
-          <p class="privacy-note">El acceso ocurre en una ventana segura del sistema. Puedes seguir trabajando localmente sin conectar una cuenta.</p>
+          <p class="privacy-note">El acceso ocurre en una ventana segura del sistema. Tazkle requiere una cuenta validada antes de abrir proyectos.</p>
         </main>
       `,
       scriptSource: "/identity/client/account.js",
@@ -152,10 +208,19 @@ function documentShell({
     input { width:100%; padding:12px 14px; color:var(--text); background:rgb(9 22 32); border:1px solid var(--line); border-radius:11px; outline:none; }
     input:focus-visible { border-color:var(--blue); box-shadow:0 0 0 3px rgba(79,124,255,.25); }
     .field-help,.privacy-note { margin:0; color:var(--muted); font-size:13px; }
+    [hidden] { display:none !important; }
+    h2 { margin:0; font-size:21px; line-height:1.2; letter-spacing:-.025em; }
+    .step-copy { margin:0 0 8px; color:var(--muted); }
+    #otp { font-size:22px; font-variant-numeric:tabular-nums; letter-spacing:.28em; text-align:center; }
+    .recovery-codes { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:16px 0; padding:0; list-style:none; }
+    .recovery-codes li { padding:9px 10px; border:1px solid var(--line); border-radius:9px; background:rgb(9 22 32); font:600 14px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; text-align:center; }
     .button { min-height:44px; margin-top:8px; padding:10px 16px; border:0; border-radius:11px; font-weight:700; cursor:pointer; }
     .button:focus-visible,.alternate:focus-visible { outline:3px solid rgba(109,214,231,.45); outline-offset:3px; }
     .button:disabled { cursor:progress; opacity:.66; }
     .primary { color:white; background:linear-gradient(135deg,var(--blue),var(--purple)); }
+    .danger { color:white; background:rgb(190 48 59); }
+    .danger-card { border-color:rgba(255,107,115,.55); }
+    .danger-text { color:var(--danger); }
     .secondary { color:var(--text); background:rgb(38 56 71); border:1px solid var(--line); }
     .social-options { display:grid; gap:10px; }
     .social-button { width:100%; min-height:44px; margin:0; display:flex; align-items:center; justify-content:center; gap:10px; color:var(--text); background:rgb(9 22 32); border:1px solid var(--line); }
@@ -171,8 +236,8 @@ function documentShell({
     .actions .button { flex:1; }
     .privacy-note { padding:0 20px; text-align:center; }
     @media (prefers-reduced-motion:no-preference) { .auth-card { animation:enter .24s ease-out both; } @keyframes enter { from { opacity:0; transform:translateY(8px); } } }
-    @media (prefers-color-scheme:light) { :root { color-scheme:light; --bg:rgb(237 242 246); --panel:rgb(255 255 255); --panel2:rgb(247 249 251); --text:rgb(8 19 29); --muted:rgb(83 101 114); --line:rgb(203 214 221); } body { background:radial-gradient(circle at 50% -10%,rgba(79,124,255,.13),transparent 40%),var(--bg); } input,.social-button { background:rgb(255 255 255); } .social-button:hover { background:rgb(247 249 251); } .secondary { background:rgb(231 237 241); } }
-    @media (max-width:480px) { .auth-card { padding:24px 20px; border-radius:18px; } h1 { font-size:27px; } }
+    @media (prefers-color-scheme:light) { :root { color-scheme:light; --bg:rgb(237 242 246); --panel:rgb(255 255 255); --panel2:rgb(247 249 251); --text:rgb(8 19 29); --muted:rgb(83 101 114); --line:rgb(203 214 221); } body { background:radial-gradient(circle at 50% -10%,rgba(79,124,255,.13),transparent 40%),var(--bg); } input,.social-button,.recovery-codes li { background:rgb(255 255 255); } .social-button:hover { background:rgb(247 249 251); } .secondary { background:rgb(231 237 241); } }
+    @media (max-width:480px) { .auth-card { padding:24px 20px; border-radius:18px; } h1 { font-size:27px; } .recovery-codes { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
@@ -230,6 +295,29 @@ function socialProviderButtons(
 
 function normalizedQuery(search: string): string {
   return search.startsWith("?") ? search.slice(1) : search;
+}
+
+function validatedAccountDeletionCallback(
+  rawValue: string | null
+): string | undefined {
+  if (rawValue !== "app.tazkle.desktop:/account/deleted") {
+    return undefined;
+  }
+  return rawValue;
+}
+
+function validatedAccountDeletionState(
+  rawValue: string | null
+): string | undefined {
+  if (
+    !rawValue ||
+    rawValue.length < 32 ||
+    rawValue.length > 128 ||
+    !/^[A-Za-z0-9_-]+$/.test(rawValue)
+  ) {
+    return undefined;
+  }
+  return rawValue;
 }
 
 function authorizationRestartURL(

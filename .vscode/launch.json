@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Sistema de planeación}",
+            "name": "Debug Tazkle",
+            "target": "Tazkle",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug Tazkle"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Sistema de planeación}",
+            "name": "Release Tazkle",
+            "target": "Tazkle",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release Tazkle"
+        }
+    ]
+}

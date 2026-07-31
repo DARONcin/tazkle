@@ -749,7 +749,7 @@ private struct TazkiRecommendation {
         case .settings:
             TazkiRecommendation(
                 title: "Sin contexto de proyecto",
-                summary: "Tazki no analiza Perfil y configuración para evitar acceso innecesario a identidad y seguridad.",
+                summary: "Tazki no analiza Configuración para evitar acceso innecesario a identidad y seguridad.",
                 time: "No aplica",
                 cost: "No aplica",
                 risk: "Privacidad",

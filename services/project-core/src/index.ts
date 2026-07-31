@@ -14,6 +14,7 @@ const app = createProjectCoreApp({
     ),
   ),
   projects: database.projects,
+  graph: database.graph,
 });
 
 startService(app, "project-core");

@@ -78,14 +78,18 @@ services:
       MICROSOFT_CLIENT_ID: ${TAZKLE_MICROSOFT_CLIENT_ID:-}
       MICROSOFT_CLIENT_SECRET_FILE: ${TAZKLE_MICROSOFT_CLIENT_ID:+/run/secrets/microsoft-oauth-secret}
       MICROSOFT_TENANT_ID: ${TAZKLE_MICROSOFT_TENANT_ID:-common}
+      RESEND_API_KEY_FILE: /run/secrets/resend-api-key
+      AUTH_EMAIL_FROM: ${TAZKLE_AUTH_EMAIL_FROM:?set TAZKLE_AUTH_EMAIL_FROM}
     secrets:
       - identity-db-password
       - better-auth-secret
       - google-oauth-secret
       - microsoft-oauth-secret
+      - resend-api-key
     expose:
       - "8791"
     networks:
+      - edge
       - services
       - data
     depends_on:
@@ -336,3 +340,5 @@ secrets:
     file: ${TAZKLE_SECRETS_DIR:?set TAZKLE_SECRETS_DIR}/google-oauth-secret
   microsoft-oauth-secret:
     file: ${TAZKLE_SECRETS_DIR:?set TAZKLE_SECRETS_DIR}/microsoft-oauth-secret
+  resend-api-key:
+    file: ${TAZKLE_SECRETS_DIR:?set TAZKLE_SECRETS_DIR}/resend-api-key

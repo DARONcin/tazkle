@@ -328,6 +328,8 @@ actor OIDCClient {
         }
         if intent == .signUp {
             queryItems.append(URLQueryItem(name: "prompt", value: "create"))
+        } else if intent == .reauthenticate {
+            queryItems.append(URLQueryItem(name: "prompt", value: "login"))
         }
         components?.queryItems = queryItems
 

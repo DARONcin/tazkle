@@ -8,6 +8,8 @@ import {
   type ProjectSummary,
 } from "@tazkle/platform-contracts";
 import type { Pool, PoolClient } from "pg";
+import { resolveActor, safeRollback } from "./db-helpers.js";
+import { ProjectOperationError } from "./errors.js";
 
 export type ProjectRepository = {
   create: (
@@ -18,16 +20,7 @@ export type ProjectRepository = {
   list: (actor: InternalActorClaims) => Promise<ProjectSummary[]>;
 };
 
-export class ProjectOperationError extends Error {
-  constructor(
-    readonly status: 403 | 409 | 422 | 503,
-    readonly code: string,
-    message: string,
-  ) {
-    super(message);
-    this.name = "ProjectOperationError";
-  }
-}
+export { ProjectOperationError };
 
 type ProjectRow = {
   id: string;
@@ -200,25 +193,6 @@ export function createPostgresProjectRepository(
   };
 }
 
-async function resolveActor(
-  client: PoolClient,
-  actor: InternalActorClaims,
-): Promise<string> {
-  const result = await client.query<{ user_id: string }>(
-    "SELECT tazkle.resolve_actor($1, $2, $3) AS user_id",
-    [actor.identityIssuer, actor.subject, actor.displayName ?? null],
-  );
-  const userId = result.rows[0]?.user_id;
-  if (!userId) {
-    throw new ProjectOperationError(
-      503,
-      "IDENTITY_UNAVAILABLE",
-      "No fue posible resolver la identidad.",
-    );
-  }
-  return userId;
-}
-
 async function ensurePersonalOrganization(
   client: PoolClient,
   userId: string,
@@ -318,14 +292,6 @@ function hashCreateProjectRequest(
       }),
     )
     .digest("hex");
-}
-
-async function safeRollback(client: PoolClient): Promise<void> {
-  try {
-    await client.query("ROLLBACK");
-  } catch {
-    // Preserve the original operation error.
-  }
 }
 
 function normalizeDatabaseError(error: unknown): Error {

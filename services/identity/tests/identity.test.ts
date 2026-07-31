@@ -21,7 +21,7 @@ test("identity publishes its bounded capability", async () => {
     service: "identity",
     authority: "identity",
     writesDomain: false,
-    externalEgress: false,
+    externalEgress: true,
   });
 });
 
@@ -82,6 +82,10 @@ test("sign-up page keeps browser validation and an atomic live status", async ()
   assert.match(body, /<form id="account-form" data-mode="signup">/);
   assert.doesNotMatch(body, /<form id="account-form" novalidate>/);
   assert.match(body, /aria-live="polite" aria-atomic="true"/);
+  assert.match(body, /id="otp-form" hidden/);
+  assert.match(body, /autocomplete="one-time-code"/);
+  assert.match(body, /pattern="\[0-9\]\{6\}"/);
+  assert.match(body, /id="recovery-step"/);
   assert.match(body, /name="oauth_query"/);
   assert.match(body, /src="\/identity\/client\/account\.js" defer/);
 });
@@ -109,8 +113,20 @@ test("account client script performs validated sign-up and OAuth continuation", 
       script.indexOf('setBusy(true, "Validando de forma segura…")'),
   );
   assert.match(script, /\/api\/auth\/sign-up\/email/);
+  assert.match(script, /\/api\/auth\/email-otp\/verify-email/);
+  assert.match(script, /\/api\/auth\/two-factor\/enable/);
+  assert.match(script, /\/api\/auth\/two-factor\/send-otp/);
+  assert.match(script, /\/api\/auth\/two-factor\/verify-otp/);
   assert.match(script, /\/api\/auth\/oauth2\/continue/);
-  assert.match(script, /created: true/);
+  assert.match(script, /await requestEmailVerificationCode\(\)/);
+  assert.match(script, /created: mode === "signup"/);
+  assert.match(script, /postLogin: mode === "signin"/);
+  assert.match(script, /showExistingAccountRecovery/);
+  assert.match(script, /El código fue correcto y el correo quedó confirmado/);
+  assert.match(script, /Solicitamos el segundo código/);
+  assert.doesNotMatch(script, /Enviamos el segundo código/);
+  assert.match(script, /trustDevice: false/);
+  assert.match(script, /recoveryCodesList\.replaceChildren/);
   assert.match(script, /invalid_signature/);
   assert.match(script, /Esta ventana segura expiró/);
 });
@@ -131,6 +147,172 @@ test("consent page loads a same-origin script that submits the decision", async 
   assert.match(pageBody, /src="\/identity\/client\/consent\.js" defer/);
   assert.match(script, /form\?\.addEventListener\("submit"/);
   assert.match(script, /\/api\/auth\/oauth2\/consent/);
+});
+
+test("account deletion page requires a bounded callback and explicit phrase", async () => {
+  const app = createIdentityApp({
+    auth: {
+      handler: async () => new Response(null, { status: 204 }),
+    },
+  });
+  const state = "a".repeat(43);
+  const validPage = await app.request(
+    `/account/delete?callback=${encodeURIComponent("app.tazkle.desktop:/account/deleted")}&state=${state}`,
+  );
+  const validBody = await validPage.text();
+  const invalidBody = await (
+    await app.request(
+      `/account/delete?callback=${encodeURIComponent("https://evil.example/delete")}&state=${state}`,
+    )
+  ).text();
+  const script = await (
+    await app.request("/identity/client/delete-account.js")
+  ).text();
+
+  assert.equal(validPage.status, 200);
+  assert.match(validBody, /id="delete-account-form"/);
+  assert.match(validBody, /Escribe ELIMINAR para confirmar/);
+  assert.match(validBody, /verificó nuevamente tu cuenta/);
+  assert.match(
+    validBody,
+    /src="\/identity\/client\/delete-account\.js" defer/,
+  );
+  assert.doesNotMatch(invalidBody, /id="delete-account-form"/);
+  assert.match(invalidBody, /solicitud de eliminación no es válida/);
+  assert.match(script, /confirmation\.value\.trim\(\) !== "ELIMINAR"/);
+  assert.match(script, /\/api\/auth\/tazkle-delete-user/);
+  assert.match(script, /confirmation: "ELIMINAR"/);
+  assert.match(script, /credentials: "same-origin"/);
+  assert.doesNotMatch(script, /innerHTML/);
+});
+
+test("account deletion confirms the remote identity is absent before succeeding", async () => {
+  const delegatedPaths: string[] = [];
+  const verifiedUserIDs: string[] = [];
+  const app = createIdentityApp({
+    auth: {
+      handler: async (request) => {
+        const path = new URL(request.url).pathname;
+        delegatedPaths.push(path);
+        if (path === "/api/auth/get-session") {
+          return Response.json({
+            session: { id: "session-123" },
+            user: { id: "user-123" },
+          });
+        }
+        if (path === "/api/auth/delete-user") {
+          return Response.json(
+            {
+              success: true,
+              message: "User deleted",
+            },
+            {
+              headers: {
+                "Set-Cookie":
+                  "tazkle.session_token=; Max-Age=0; HttpOnly; SameSite=Lax",
+              },
+            },
+          );
+        }
+        return Response.json({ code: "NOT_FOUND" }, { status: 404 });
+      },
+    },
+    accountDeletion: {
+      userExists: async (userID) => {
+        verifiedUserIDs.push(userID);
+        return false;
+      },
+    },
+  });
+
+  const response = await app.request("/api/auth/tazkle-delete-user", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Cookie: "tazkle.session_token=signed",
+      Origin: "https://identity.tazkle.app",
+    },
+    body: JSON.stringify({ confirmation: "ELIMINAR" }),
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    success: true,
+    message: "User deleted",
+  });
+  assert.deepEqual(delegatedPaths, [
+    "/api/auth/get-session",
+    "/api/auth/delete-user",
+  ]);
+  assert.deepEqual(verifiedUserIDs, ["user-123"]);
+  assert.match(
+    response.headers.get("set-cookie") ?? "",
+    /Max-Age=0/,
+  );
+});
+
+test("account deletion preserves local data when the remote user remains", async () => {
+  const app = createIdentityApp({
+    auth: {
+      handler: async (request) => {
+        const path = new URL(request.url).pathname;
+        if (path === "/api/auth/get-session") {
+          return Response.json({
+            session: { id: "session-123" },
+            user: { id: "user-123" },
+          });
+        }
+        return Response.json({
+          success: true,
+          message: "User deleted",
+        });
+      },
+    },
+    accountDeletion: {
+      userExists: async () => true,
+    },
+  });
+
+  const response = await app.request("/api/auth/tazkle-delete-user", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: "tazkle.session_token=signed",
+    },
+    body: JSON.stringify({ confirmation: "ELIMINAR" }),
+  });
+  const payload = await response.json();
+
+  assert.equal(response.status, 503);
+  assert.equal(payload.code, "REMOTE_DELETION_UNCONFIRMED");
+  assert.match(payload.message, /datos locales se conservaron/);
+});
+
+test("account deletion rejects an invalid phrase before touching Identity", async () => {
+  let delegatedCalls = 0;
+  const app = createIdentityApp({
+    auth: {
+      handler: async () => {
+        delegatedCalls += 1;
+        return Response.json({ success: true });
+      },
+    },
+    accountDeletion: {
+      userExists: async () => false,
+    },
+  });
+
+  const response = await app.request("/api/auth/tazkle-delete-user", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ confirmation: "eliminar" }),
+  });
+
+  assert.equal(response.status, 400);
+  assert.equal(delegatedCalls, 0);
 });
 
 test("account mode links restart authorization without reusing signed state", async () => {

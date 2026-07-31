@@ -18,6 +18,11 @@ export type IdentityConfiguration = {
   };
   audience: string;
   secureCookies: boolean;
+  transactionalEmail: {
+    provider: "resend";
+    apiKey: string;
+    from: string;
+  };
   socialProviders: {
     google?: OAuthProviderCredentials;
     microsoft?: OAuthProviderCredentials & {
@@ -69,6 +74,11 @@ export function identityConfigurationFromEnvironment(
     environment.MICROSOFT_CLIENT_SECRET_FILE,
     "Microsoft",
   );
+  const resendAPIKey = requireResendAPIKey(
+    environment.RESEND_API_KEY,
+    environment.RESEND_API_KEY_FILE,
+  );
+  const authEmailFrom = requireEmailSender(environment.AUTH_EMAIL_FROM);
 
   return {
     publicBaseURL,
@@ -86,6 +96,11 @@ export function identityConfigurationFromEnvironment(
     },
     audience,
     secureCookies: publicBaseURL.protocol === "https:",
+    transactionalEmail: {
+      provider: "resend",
+      apiKey: resendAPIKey,
+      from: authEmailFrom,
+    },
     socialProviders: {
       ...(google ? { google } : {}),
       ...(microsoft
@@ -102,6 +117,41 @@ export function identityConfigurationFromEnvironment(
         : {}),
     },
   };
+}
+
+function requireResendAPIKey(
+  environmentValue: string | undefined,
+  filePath: string | undefined,
+): string {
+  const value = readSecretValue(
+    environmentValue,
+    filePath,
+    "Resend API key",
+  );
+  if (
+    value.length > 512 ||
+    !/^re_[A-Za-z0-9_-]+$/.test(value)
+  ) {
+    throw new Error("Resend API key is invalid");
+  }
+  return value;
+}
+
+function requireEmailSender(rawValue: string | undefined): string {
+  const value = rawValue?.trim() ?? "";
+  const mailbox = "[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+";
+  const senderPattern = new RegExp(
+    `^(?:${mailbox}|[^<>\\r\\n]{1,120}\\s<${mailbox}>)$`,
+    "i",
+  );
+  if (
+    value.length > 320 ||
+    /[\u0000-\u001F\u007F]/.test(value) ||
+    !senderPattern.test(value)
+  ) {
+    throw new Error("AUTH_EMAIL_FROM must be a safe email sender");
+  }
+  return value;
 }
 
 export function enabledSocialProviders(

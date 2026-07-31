@@ -38,6 +38,6 @@ struct PreferencesView: View {
         }
         .formStyle(.grouped)
         .padding(TazkleSpacing.large)
-        .navigationTitle(appState.selectedDestination?.title ?? "Perfil y configuración")
+        .navigationTitle(appState.selectedDestination?.title ?? "Configuración")
     }
 }

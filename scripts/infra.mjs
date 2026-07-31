@@ -149,6 +149,8 @@ async function initializeLocalEnvironment(destination) {
     `TAZKLE_IDENTITY_DATABASE_PASSWORD=${secret()}`,
     `TAZKLE_INTERNAL_IDENTITY_SECRET=${secret()}`,
     `TAZKLE_BETTER_AUTH_SECRET=${secret()}`,
+    "TAZKLE_RESEND_API_KEY=",
+    "TAZKLE_AUTH_EMAIL_FROM=Tazkle <onboarding@resend.dev>",
     "TAZKLE_BETTER_AUTH_URL=http://127.0.0.1:8787/api/auth",
     "TAZKLE_OIDC_ISSUER=http://127.0.0.1:8787/api/auth",
     "TAZKLE_OIDC_AUDIENCE=tazkle-local",
@@ -191,6 +193,7 @@ async function prepareSecretFiles(environment) {
     "identity-db-password": environment.TAZKLE_IDENTITY_DATABASE_PASSWORD,
     "internal-identity-secret": environment.TAZKLE_INTERNAL_IDENTITY_SECRET,
     "better-auth-secret": environment.TAZKLE_BETTER_AUTH_SECRET,
+    "resend-api-key": environment.TAZKLE_RESEND_API_KEY,
     "google-oauth-secret": optionalProviderSecret(
       environment.TAZKLE_GOOGLE_CLIENT_ID,
       environment.TAZKLE_GOOGLE_CLIENT_SECRET,

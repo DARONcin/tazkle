@@ -70,7 +70,7 @@ func validatesProviderEmailClaimsWithoutPersistingOrInterpretingThem() {
 }
 
 @Test
-func distinguishesSignInFromDirectAccountCreation() throws {
+func distinguishesSignInCreationAndSensitiveReauthentication() throws {
     let configuration = try OIDCConfiguration(
         issuer: URL(string: "https://identity.example.com")!,
         clientID: "tazkle-macos",
@@ -98,17 +98,36 @@ func distinguishesSignInFromDirectAccountCreation() throws {
         codeVerifier: "verifier",
         intent: .signUp
     )
+    let reauthenticationRequest = try OIDCClient.authorizationRequest(
+        metadata: metadata,
+        configuration: configuration,
+        state: "state",
+        codeVerifier: "verifier",
+        intent: .reauthenticate
+    )
     let signInQuery = try #require(
         URLComponents(url: signInRequest.url, resolvingAgainstBaseURL: false)?.queryItems
     )
     let signUpQuery = try #require(
         URLComponents(url: signUpRequest.url, resolvingAgainstBaseURL: false)?.queryItems
     )
+    let reauthenticationQuery = try #require(
+        URLComponents(
+            url: reauthenticationRequest.url,
+            resolvingAgainstBaseURL: false
+        )?.queryItems
+    )
 
     #expect(signInQuery.first { $0.name == "prompt" } == nil)
     #expect(signInQuery.first { $0.name == "login_hint" } == nil)
     #expect(signUpQuery.first { $0.name == "prompt" }?.value == "create")
     #expect(signUpQuery.first { $0.name == "login_hint" } == nil)
+    #expect(
+        reauthenticationQuery.first { $0.name == "prompt" }?.value == "login"
+    )
+    #expect(
+        reauthenticationQuery.first { $0.name == "login_hint" } == nil
+    )
 }
 
 @Test
@@ -182,7 +201,7 @@ func rejectsACallbackWithTheWrongStateBeforeTokenExchange() async throws {
 }
 
 @Test @MainActor
-func keepsLocalModeDistinctFromAnAuthenticatedSession() throws {
+func requiresAValidatedSessionBeforeWorkspaceAccess() throws {
     let configuration = try OIDCConfiguration(
         issuer: URL(string: "https://identity.example.com")!,
         clientID: "tazkle-macos",
@@ -194,14 +213,51 @@ func keepsLocalModeDistinctFromAnAuthenticatedSession() throws {
         credentialStore: MemoryCredentialStore()
     )
 
-    controller.continueLocally()
+    #expect(controller.state == .signedOut)
+    #expect(!controller.state.permitsWorkspace)
+    #expect(AuthenticationState.offline.permitsWorkspace)
+}
 
-    #expect(controller.state == .localOnly)
-    #expect(controller.state.permitsWorkspace)
+@Test
+func accountDeletionReauthenticationMustMatchTheActiveWorkspace() throws {
+    let issuer = URL(string: "https://identity.example.com/api/auth")!
+    let original = try #require(
+        AuthenticatedUser(
+            subject: "original-account",
+            name: "Original",
+            email: "original@example.com",
+            isEmailVerified: true
+        )
+    )
+    let other = try #require(
+        AuthenticatedUser(
+            subject: "other-account",
+            name: "Other",
+            email: "other@example.com",
+            isEmailVerified: true
+        )
+    )
+
+    let expected = AuthenticationController.workspaceAccountID(
+        issuer: issuer,
+        user: original
+    )
+    let reauthenticated = AuthenticationController.workspaceAccountID(
+        issuer: issuer,
+        user: original
+    )
+    let mismatched = AuthenticationController.workspaceAccountID(
+        issuer: issuer,
+        user: other
+    )
+
+    #expect(reauthenticated == expected)
+    #expect(mismatched != expected)
 }
 
 private final class MemoryCredentialStore: RefreshCredentialStore, @unchecked Sendable {
     private var credentials: [String: String] = [:]
+    private var users: [String: AuthenticatedUser] = [:]
     private let lock = NSLock()
 
     func read(account: String) throws -> String? {
@@ -214,9 +270,20 @@ private final class MemoryCredentialStore: RefreshCredentialStore, @unchecked Se
         }
     }
 
+    func readUser(account: String) throws -> AuthenticatedUser? {
+        lock.withLock { users[account] }
+    }
+
+    func saveUser(_ user: AuthenticatedUser, account: String) throws {
+        lock.withLock {
+            users[account] = user
+        }
+    }
+
     func delete(account: String) throws {
-        _ = lock.withLock {
+        lock.withLock {
             credentials.removeValue(forKey: account)
+            users.removeValue(forKey: account)
         }
     }
 }
