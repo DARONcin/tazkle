@@ -1078,11 +1078,148 @@ private struct RoleRatesSettingsView: View {
                         .accessibilityElement(children: .combine)
                 }
             }
+
+            OrganizationPlanningDefaultsCard()
+        }
+        .task {
+            guard appState.teamLoadState == .idle else { return }
+            await appState.loadTeamMembers(using: authentication)
         }
         .task {
             guard appState.roleRatesLoadState == .idle else { return }
             await appState.loadRoleRates(using: authentication)
         }
+    }
+}
+
+private struct OrganizationPlanningDefaultsCard: View {
+    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var authentication: AuthenticationController
+
+    @State private var reserveDraft = ""
+    @State private var marginDraft = ""
+    @State private var workdayDraft = ""
+    @FocusState private var focusedField: Field?
+
+    private enum Field {
+        case reserve, margin, workday
+    }
+
+    var body: some View {
+        ProjectSectionCard(title: "Valores predeterminados", systemImage: "slider.horizontal.3") {
+            Text("Reserva de riesgo, margen objetivo y jornada usados por defecto al cotizar. Moneda fija en MXN.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            switch appState.organizationPlanningDefaultsLoadState {
+            case .idle:
+                EmptyView()
+            case .loading:
+                Label("Cargando valores predeterminados…", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            case .offline:
+                Label("Sin conexión; se actualizarán al recuperar conexión.", systemImage: "wifi.slash")
+                    .font(.callout)
+                    .foregroundStyle(TazkleColors.warning)
+            case let .error(message):
+                Label(message, systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout)
+                    .foregroundStyle(TazkleColors.warning)
+            case .loaded:
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: TazkleSpacing.large) {
+                        field("Reserva de riesgo", suffix: "%", text: $reserveDraft, focus: .reserve)
+                        field("Margen objetivo", suffix: "%", text: $marginDraft, focus: .margin)
+                        field("Jornada", suffix: "h", text: $workdayDraft, focus: .workday)
+                        SettingsValueRow(title: "Moneda", detail: "Fija por ahora", value: "MXN", systemImage: "pesosign.circle")
+                            .frame(maxWidth: 220)
+                    }
+                    VStack(alignment: .leading, spacing: TazkleSpacing.medium) {
+                        field("Reserva de riesgo", suffix: "%", text: $reserveDraft, focus: .reserve)
+                        field("Margen objetivo", suffix: "%", text: $marginDraft, focus: .margin)
+                        field("Jornada", suffix: "h", text: $workdayDraft, focus: .workday)
+                        SettingsValueRow(title: "Moneda", detail: "Fija por ahora", value: "MXN", systemImage: "pesosign.circle")
+                    }
+                }
+
+                HStack {
+                    if case let .error(message) = appState.organizationPlanningDefaultsSaveState {
+                        Label(message, systemImage: "exclamationmark.circle")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(TazkleColors.warning)
+                    }
+                    Spacer()
+                    Button("Guardar valores predeterminados") { Task { await save() } }
+                        .buttonStyle(.borderedProminent)
+                        .tint(TazkleColors.relationship)
+                        .disabled(
+                            appState.organizationPlanningDefaultsSaveState == .saving
+                                || !hasChange
+                        )
+                }
+            }
+        }
+        .onAppear { syncDrafts() }
+        .onChange(of: appState.organizationPlanningDefaults) { _, _ in
+            if focusedField == nil { syncDrafts() }
+        }
+        .task(id: appState.currentOrganizationID) {
+            guard appState.organizationPlanningDefaultsLoadState == .idle,
+                  appState.currentOrganizationID != nil
+            else { return }
+            await appState.loadOrganizationPlanningDefaults(using: authentication)
+        }
+    }
+
+    private func field(_ title: String, suffix: String, text: Binding<String>, focus: Field) -> some View {
+        VStack(alignment: .leading, spacing: TazkleSpacing.xSmall) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack(spacing: TazkleSpacing.xSmall) {
+                TextField("", text: text)
+                    .accountFieldSurface()
+                    .frame(width: 64)
+                    .multilineTextAlignment(.trailing)
+                    .focused($focusedField, equals: focus)
+                    .accessibilityLabel(title)
+                Text(suffix)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var hasChange: Bool {
+        guard let defaults = appState.organizationPlanningDefaults,
+              let reserve = Int(reserveDraft),
+              let margin = Int(marginDraft),
+              let workday = Int(workdayDraft)
+        else { return false }
+        return reserve != defaults.riskReservePercent
+            || margin != defaults.targetMarginPercent
+            || workday != defaults.workdayHours
+    }
+
+    private func syncDrafts() {
+        guard let defaults = appState.organizationPlanningDefaults else { return }
+        reserveDraft = String(defaults.riskReservePercent)
+        marginDraft = String(defaults.targetMarginPercent)
+        workdayDraft = String(defaults.workdayHours)
+    }
+
+    private func save() async {
+        guard let reserve = Int(reserveDraft), (0...100).contains(reserve),
+              let margin = Int(marginDraft), (0...100).contains(margin),
+              let workday = Int(workdayDraft), (1...24).contains(workday)
+        else { return }
+        await appState.saveOrganizationPlanningDefaults(
+            riskReservePercent: reserve,
+            targetMarginPercent: margin,
+            workdayHours: workday,
+            using: authentication
+        )
     }
 }
 

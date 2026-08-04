@@ -38,6 +38,29 @@ struct PlatformAPIClient {
         return response.rate
     }
 
+    func fetchOrganizationPlanningDefaults(
+        organizationId: UUID,
+        accessToken: String
+    ) async throws -> OrganizationPlanningDefaults {
+        try await get(
+            "v1/organizations/\(organizationId.uuidString)/planning-defaults",
+            accessToken: accessToken
+        )
+    }
+
+    func updateOrganizationPlanningDefaults(
+        organizationId: UUID,
+        _ command: UpdateOrganizationPlanningDefaultsCommand,
+        accessToken: String
+    ) async throws -> OrganizationPlanningDefaults {
+        let response: UpdateOrganizationPlanningDefaultsResponse = try await put(
+            "v1/organizations/\(organizationId.uuidString)/planning-defaults",
+            body: command,
+            accessToken: accessToken
+        )
+        return response.defaults
+    }
+
     private func get<Response: Decodable>(
         _ path: String,
         accessToken: String

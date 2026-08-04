@@ -7,6 +7,10 @@ import {
   type MemberRepository,
 } from "./members.js";
 import {
+  createPostgresOrganizationPlanningRepository,
+  type OrganizationPlanningRepository,
+} from "./organization-planning.js";
+import {
   createPostgresProjectRepository,
   type ProjectRepository,
 } from "./projects.js";
@@ -22,6 +26,7 @@ export type DatabaseConnection = {
   graph: GraphRepository;
   members: MemberRepository;
   roleRates: RoleRateRepository;
+  organizationPlanning: OrganizationPlanningRepository;
 };
 
 export function createDatabaseConnection(
@@ -56,6 +61,10 @@ export function createDatabaseConnection(
         list: unavailable,
         upsert: unavailable,
       },
+      organizationPlanning: {
+        get: unavailable,
+        update: unavailable,
+      },
     };
   }
 
@@ -89,6 +98,7 @@ export function createDatabaseConnection(
     graph: createPostgresGraphRepository(pool),
     members: createPostgresMemberRepository(pool),
     roleRates: createPostgresRoleRateRepository(pool),
+    organizationPlanning: createPostgresOrganizationPlanningRepository(pool),
   };
 }
 

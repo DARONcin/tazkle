@@ -211,6 +211,20 @@ enum RoleRateSaveState: Equatable {
     case error(String)
 }
 
+enum OrganizationPlanningDefaultsLoadState: Equatable {
+    case idle
+    case loading
+    case loaded
+    case offline
+    case error(String)
+}
+
+enum OrganizationPlanningDefaultsSaveState: Equatable {
+    case idle
+    case saving
+    case error(String)
+}
+
 @MainActor
 final class AppState: ObservableObject {
     @Published var graph: ProjectGraph
@@ -252,6 +266,9 @@ final class AppState: ObservableObject {
     @Published private(set) var roleRates: [RoleRate] = []
     @Published private(set) var roleRatesLoadState: RoleRatesLoadState = .idle
     @Published private(set) var roleRateSaveState: RoleRateSaveState = .idle
+    @Published private(set) var organizationPlanningDefaults: OrganizationPlanningDefaults?
+    @Published private(set) var organizationPlanningDefaultsLoadState: OrganizationPlanningDefaultsLoadState = .idle
+    @Published private(set) var organizationPlanningDefaultsSaveState: OrganizationPlanningDefaultsSaveState = .idle
 
     private var store: SQLiteProjectStore?
     private(set) var activeWorkspaceAccountID: String?
@@ -429,6 +446,82 @@ final class AppState: ObservableObject {
             roleRateSaveState = .error("Sólo un administrador de la organización puede capturar tarifas internas.")
         } catch {
             roleRateSaveState = .error("No fue posible guardar la tarifa. Inténtalo nuevamente.")
+        }
+    }
+
+    func loadOrganizationPlanningDefaults(using authentication: AuthenticationController) async {
+        guard let organizationId = currentOrganizationID else {
+            organizationPlanningDefaultsLoadState = .error("Todavía no se pudo determinar tu organización.")
+            return
+        }
+        guard let issuer = authentication.configuration?.issuer,
+              let baseURL = URL.platformGatewayBaseURL(fromIssuer: issuer)
+        else {
+            organizationPlanningDefaultsLoadState = .error("No hay una sesión configurada para cargar los valores predeterminados.")
+            return
+        }
+
+        organizationPlanningDefaultsLoadState = .loading
+        do {
+            let accessToken = try await authentication.validAccessToken()
+            let client = PlatformAPIClient(baseURL: baseURL)
+            organizationPlanningDefaults = try await client.fetchOrganizationPlanningDefaults(
+                organizationId: organizationId,
+                accessToken: accessToken
+            )
+            organizationPlanningDefaultsLoadState = .loaded
+        } catch AuthenticationFailure.providerUnavailable {
+            organizationPlanningDefaultsLoadState = .offline
+        } catch is AuthenticationFailure {
+            organizationPlanningDefaultsLoadState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
+        } catch PlatformAPIError.unauthorized {
+            organizationPlanningDefaultsLoadState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
+        } catch {
+            organizationPlanningDefaultsLoadState = .error("No fue posible cargar los valores predeterminados. Inténtalo nuevamente.")
+        }
+    }
+
+    func saveOrganizationPlanningDefaults(
+        riskReservePercent: Int,
+        targetMarginPercent: Int,
+        workdayHours: Int,
+        using authentication: AuthenticationController
+    ) async {
+        guard let organizationId = currentOrganizationID else {
+            organizationPlanningDefaultsSaveState = .error("Todavía no se pudo determinar tu organización.")
+            return
+        }
+        guard let issuer = authentication.configuration?.issuer,
+              let baseURL = URL.platformGatewayBaseURL(fromIssuer: issuer)
+        else {
+            organizationPlanningDefaultsSaveState = .error("No hay una sesión configurada para guardar los valores predeterminados.")
+            return
+        }
+
+        organizationPlanningDefaultsSaveState = .saving
+        do {
+            let accessToken = try await authentication.validAccessToken()
+            let client = PlatformAPIClient(baseURL: baseURL)
+            organizationPlanningDefaults = try await client.updateOrganizationPlanningDefaults(
+                organizationId: organizationId,
+                UpdateOrganizationPlanningDefaultsCommand(
+                    riskReservePercent: riskReservePercent,
+                    targetMarginPercent: targetMarginPercent,
+                    workdayHours: workdayHours
+                ),
+                accessToken: accessToken
+            )
+            organizationPlanningDefaultsSaveState = .idle
+        } catch AuthenticationFailure.providerUnavailable {
+            organizationPlanningDefaultsSaveState = .error("Sin conexión; los valores no se guardaron.")
+        } catch is AuthenticationFailure {
+            organizationPlanningDefaultsSaveState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
+        } catch PlatformAPIError.unauthorized {
+            organizationPlanningDefaultsSaveState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
+        } catch PlatformAPIError.forbidden {
+            organizationPlanningDefaultsSaveState = .error("Sólo un administrador de la organización puede capturar estos valores.")
+        } catch {
+            organizationPlanningDefaultsSaveState = .error("No fue posible guardar los valores. Inténtalo nuevamente.")
         }
     }
 

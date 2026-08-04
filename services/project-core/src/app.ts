@@ -2,9 +2,11 @@ import {
   createProjectCommandSchema,
   idempotencyKeySchema,
   membersListResponseSchema,
+  organizationPlanningDefaultsSchema,
   projectListResponseSchema,
   replaceProjectGraphCommandSchema,
   roleRatesListResponseSchema,
+  updateOrganizationPlanningDefaultsCommandSchema,
   upsertRoleRateCommandSchema,
   type DependencyStatus,
   type InternalActorClaims,
@@ -23,10 +25,12 @@ import {
   type InternalActorVerifier,
 } from "./identity.js";
 import type { MemberRepository } from "./members.js";
+import type { OrganizationPlanningRepository } from "./organization-planning.js";
 import type { ProjectRepository } from "./projects.js";
 import type { RoleRateRepository } from "./role-rates.js";
 
 const projectIdParamSchema = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const organizationIdParamSchema = projectIdParamSchema;
 
 type ProjectCoreAppOptions = {
   databaseProbe: () => Promise<DependencyStatus[]>;
@@ -35,6 +39,7 @@ type ProjectCoreAppOptions = {
   graph: GraphRepository;
   members: MemberRepository;
   roleRates: RoleRateRepository;
+  organizationPlanning: OrganizationPlanningRepository;
 };
 
 export function createProjectCoreApp({
@@ -44,6 +49,7 @@ export function createProjectCoreApp({
   graph,
   members,
   roleRates,
+  organizationPlanning,
 }: ProjectCoreAppOptions) {
   const app = createServiceApp({
     service: "project-core",
@@ -162,6 +168,50 @@ export function createProjectCoreApp({
     }
   });
 
+  app.get(
+    "/internal/v1/organizations/:organizationId/planning-defaults",
+    async (context) => {
+      try {
+        const actor = await authenticateInternalRequest(context, actorVerifier);
+        const organizationId = requireOrganizationId(
+          context.req.param("organizationId"),
+        );
+        const response = await organizationPlanning.get(actor, organizationId);
+        return context.json(organizationPlanningDefaultsSchema.parse(response));
+      } catch (error) {
+        return operationErrorResponse(context, error);
+      }
+    },
+  );
+
+  app.put(
+    "/internal/v1/organizations/:organizationId/planning-defaults",
+    async (context) => {
+      try {
+        requireJSONContentType(context.req.header("Content-Type"));
+        const actor = await authenticateInternalRequest(context, actorVerifier);
+        const organizationId = requireOrganizationId(
+          context.req.param("organizationId"),
+        );
+        const idempotencyKey = idempotencyKeySchema.parse(
+          context.req.header("Idempotency-Key"),
+        );
+        const command = updateOrganizationPlanningDefaultsCommandSchema.parse(
+          await context.req.json(),
+        );
+        const response = await organizationPlanning.update(
+          actor,
+          organizationId,
+          command,
+          idempotencyKey,
+        );
+        return context.json(response, response.replayed ? 200 : 201);
+      } catch (error) {
+        return operationErrorResponse(context, error);
+      }
+    },
+  );
+
   return app;
 }
 
@@ -171,6 +221,17 @@ function requireProjectId(value: string | undefined): string {
       400,
       "INVALID_PROJECT_ID",
       "El identificador de proyecto no es válido.",
+    );
+  }
+  return value;
+}
+
+function requireOrganizationId(value: string | undefined): string {
+  if (!value || !organizationIdParamSchema.test(value)) {
+    throw new RequestValidationError(
+      400,
+      "INVALID_ORGANIZATION_ID",
+      "El identificador de organización no es válido.",
     );
   }
   return value;

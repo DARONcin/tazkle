@@ -5,12 +5,15 @@ import {
   HTTP_HEADERS,
   idempotencyKeySchema,
   membersListResponseSchema,
+  organizationPlanningDefaultsSchema,
   platformCapabilitiesSchema,
   projectGraphResponseSchema,
   projectListResponseSchema,
   replaceProjectGraphCommandSchema,
   roleRatesListResponseSchema,
   serviceCapabilitySchema,
+  updateOrganizationPlanningDefaultsCommandSchema,
+  updateOrganizationPlanningDefaultsResponseSchema,
   upsertRoleRateCommandSchema,
   upsertRoleRateResponseSchema,
   type HealthResponse,
@@ -352,6 +355,82 @@ export function createGatewayApp({
       return gatewayOperationError(context, error);
     }
   });
+
+  app.get(
+    "/v1/organizations/:organizationId/planning-defaults",
+    async (context) => {
+      try {
+        requireJSONAccept(context.req.header("Accept"));
+        const internalToken = await authenticateAndSign(
+          context,
+          accessTokens,
+          internalActors,
+        );
+        const response = await fetchInternal(
+          new URL(
+            `/internal/v1/organizations/${context.req.param("organizationId")}/planning-defaults`,
+            urls.projectCore,
+          ),
+          {
+            method: "GET",
+            headers: internalHeaders(internalToken),
+          },
+          fetchImplementation,
+        );
+        return proxyProjectResponse(
+          context,
+          response,
+          organizationPlanningDefaultsSchema,
+        );
+      } catch (error) {
+        return gatewayOperationError(context, error);
+      }
+    },
+  );
+
+  app.put(
+    "/v1/organizations/:organizationId/planning-defaults",
+    async (context) => {
+      try {
+        requireJSONAccept(context.req.header("Accept"));
+        requireJSONContentType(context.req.header("Content-Type"));
+        const idempotencyKey = idempotencyKeySchema.parse(
+          context.req.header(HTTP_HEADERS.idempotencyKey),
+        );
+        const internalToken = await authenticateAndSign(
+          context,
+          accessTokens,
+          internalActors,
+        );
+        const command = updateOrganizationPlanningDefaultsCommandSchema.parse(
+          await context.req.json(),
+        );
+        const response = await fetchInternal(
+          new URL(
+            `/internal/v1/organizations/${context.req.param("organizationId")}/planning-defaults`,
+            urls.projectCore,
+          ),
+          {
+            method: "PUT",
+            headers: {
+              ...internalHeaders(internalToken),
+              "Content-Type": "application/json",
+              [HTTP_HEADERS.idempotencyKey]: idempotencyKey,
+            },
+            body: JSON.stringify(command),
+          },
+          fetchImplementation,
+        );
+        return proxyProjectResponse(
+          context,
+          response,
+          updateOrganizationPlanningDefaultsResponseSchema,
+        );
+      } catch (error) {
+        return gatewayOperationError(context, error);
+      }
+    },
+  );
 
   return app;
 }
