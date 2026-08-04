@@ -7,7 +7,9 @@ import {
   InternalAuthenticationError,
   type InternalActorVerifier,
 } from "../src/identity.js";
+import type { MemberRepository } from "../src/members.js";
 import type { ProjectRepository } from "../src/projects.js";
+import type { RoleRateRepository } from "../src/role-rates.js";
 
 const actor = {
   identityIssuer: "https://identity.test",
@@ -50,12 +52,31 @@ const graph: GraphRepository = {
   }),
 };
 
+const members: MemberRepository = {
+  list: async () => ({ members: [] }),
+};
+
+const roleRates: RoleRateRepository = {
+  list: async () => ({ rates: [] }),
+  upsert: async (_actor, command) => ({
+    rate: {
+      organizationId: command.organizationId,
+      role: command.role,
+      hourlyRateMXN: command.hourlyRateMXN,
+      updatedAt: "2026-07-28T18:00:00.000Z",
+    },
+    replayed: false,
+  }),
+};
+
 test("project core is the only service declaring domain-write authority", async () => {
   const app = createProjectCoreApp({
     databaseProbe: async () => [{ name: "postgres", status: "available" }],
     actorVerifier,
     projects,
     graph,
+    members,
+    roleRates,
   });
 
   const response = await app.request("/internal/capabilities");
@@ -79,6 +100,8 @@ test("project core readiness reflects database failure without exposing details"
     actorVerifier,
     projects,
     graph,
+    members,
+    roleRates,
   });
 
   const response = await app.request("/health/ready");
@@ -106,6 +129,8 @@ test("project core rejects a mutation without a signed internal actor", async ()
       },
     },
     graph,
+    members,
+    roleRates,
   });
 
   const response = await app.request("/internal/v1/projects", {
@@ -140,6 +165,8 @@ test("project core creates a project from the narrow command contract", async ()
       },
     },
     graph,
+    members,
+    roleRates,
   });
 
   const response = await app.request("/internal/v1/projects", {
@@ -174,6 +201,8 @@ test("project core rejects mass assignment fields", async () => {
       },
     },
     graph,
+    members,
+    roleRates,
   });
 
   const response = await app.request("/internal/v1/projects", {
@@ -200,6 +229,8 @@ test("project core reads the project graph", async () => {
     actorVerifier,
     projects,
     graph,
+    members,
+    roleRates,
   });
 
   const response = await app.request(
@@ -219,6 +250,8 @@ test("project core rejects a malformed project id", async () => {
     actorVerifier,
     projects,
     graph,
+    members,
+    roleRates,
   });
 
   const response = await app.request(
@@ -242,6 +275,8 @@ test("project core replaces the project graph atomically", async () => {
         return graph.replace(verifiedActor, forProjectId, command, "irrelevant");
       },
     },
+    members,
+    roleRates,
   });
 
   const blockId = "550e8400-e29b-41d4-a716-446655440003";
@@ -297,6 +332,8 @@ test("project core rejects a graph replace with a stale row version", async () =
         );
       },
     },
+    members,
+    roleRates,
   });
 
   const response = await app.request(
@@ -325,6 +362,8 @@ test("project core rejects a graph replace with a self-relation", async () => {
     actorVerifier,
     projects,
     graph,
+    members,
+    roleRates,
   });
 
   const blockId = "550e8400-e29b-41d4-a716-446655440003";
@@ -370,4 +409,206 @@ test("project core rejects a graph replace with a self-relation", async () => {
   );
 
   assert.equal(response.status, 400);
+});
+
+test("project core lists teammates across accessible organizations", async () => {
+  const organizationId = "550e8400-e29b-41d4-a716-446655440005";
+  const app = createProjectCoreApp({
+    databaseProbe: async () => [],
+    actorVerifier,
+    projects,
+    graph,
+    members: {
+      list: async () => ({
+        members: [
+          {
+            organizationId,
+            userId: "550e8400-e29b-41d4-a716-446655440006",
+            displayName: "Ana",
+            role: "organization-admin",
+            status: "active",
+            createdAt: "2026-07-28T18:00:00.000Z",
+          },
+        ],
+      }),
+    },
+    roleRates,
+  });
+
+  const response = await app.request("/internal/v1/members", {
+    headers: { Authorization: "Bearer internal.payload.signature" },
+  });
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.members.length, 1);
+  assert.equal(payload.members[0].displayName, "Ana");
+  assert.equal(payload.members[0].role, "organization-admin");
+});
+
+test("project core rejects a members list without a signed internal actor", async () => {
+  let repositoryCalls = 0;
+  const app = createProjectCoreApp({
+    databaseProbe: async () => [],
+    actorVerifier: {
+      verify: async () => {
+        throw new InternalAuthenticationError();
+      },
+    },
+    projects,
+    graph,
+    members: {
+      list: async () => {
+        repositoryCalls += 1;
+        throw new Error("must not be called");
+      },
+    },
+    roleRates,
+  });
+
+  const response = await app.request("/internal/v1/members");
+
+  assert.equal(response.status, 401);
+  assert.equal(repositoryCalls, 0);
+});
+
+test("project core lists role rates across accessible organizations", async () => {
+  const organizationId = "550e8400-e29b-41d4-a716-446655440005";
+  const app = createProjectCoreApp({
+    databaseProbe: async () => [],
+    actorVerifier,
+    projects,
+    graph,
+    members,
+    roleRates: {
+      ...roleRates,
+      list: async () => ({
+        rates: [
+          {
+            organizationId,
+            role: "development",
+            hourlyRateMXN: 750,
+            updatedAt: "2026-07-28T18:00:00.000Z",
+          },
+        ],
+      }),
+    },
+  });
+
+  const response = await app.request("/internal/v1/role-rates", {
+    headers: { Authorization: "Bearer internal.payload.signature" },
+  });
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.rates.length, 1);
+  assert.equal(payload.rates[0].role, "development");
+  assert.equal(payload.rates[0].hourlyRateMXN, 750);
+});
+
+test("project core upserts a role rate with a signed internal actor", async () => {
+  const organizationId = "550e8400-e29b-41d4-a716-446655440005";
+  const app = createProjectCoreApp({
+    databaseProbe: async () => [],
+    actorVerifier,
+    projects,
+    graph,
+    members,
+    roleRates,
+  });
+
+  const response = await app.request("/internal/v1/role-rates", {
+    method: "PUT",
+    headers: {
+      Authorization: "Bearer internal.payload.signature",
+      "Content-Type": "application/json",
+      "Idempotency-Key": "role-rate-upsert-0000000000000001",
+    },
+    body: JSON.stringify({
+      organizationId,
+      role: "development",
+      hourlyRateMXN: 750,
+    }),
+  });
+  const payload = await response.json();
+
+  assert.equal(response.status, 201);
+  assert.equal(payload.rate.role, "development");
+  assert.equal(payload.rate.hourlyRateMXN, 750);
+  assert.equal(payload.replayed, false);
+});
+
+test("project core rejects a role rate upsert from a non-admin actor", async () => {
+  const organizationId = "550e8400-e29b-41d4-a716-446655440005";
+  const app = createProjectCoreApp({
+    databaseProbe: async () => [],
+    actorVerifier,
+    projects,
+    graph,
+    members,
+    roleRates: {
+      ...roleRates,
+      upsert: async () => {
+        throw new ProjectOperationError(
+          403,
+          "RATE_MANAGEMENT_FORBIDDEN",
+          "Sólo un administrador de la organización puede capturar tarifas internas.",
+        );
+      },
+    },
+  });
+
+  const response = await app.request("/internal/v1/role-rates", {
+    method: "PUT",
+    headers: {
+      Authorization: "Bearer internal.payload.signature",
+      "Content-Type": "application/json",
+      "Idempotency-Key": "role-rate-upsert-0000000000000002",
+    },
+    body: JSON.stringify({
+      organizationId,
+      role: "development",
+      hourlyRateMXN: 750,
+    }),
+  });
+
+  assert.equal(response.status, 403);
+});
+
+test("project core rejects a role rate upsert without a signed internal actor", async () => {
+  let repositoryCalls = 0;
+  const app = createProjectCoreApp({
+    databaseProbe: async () => [],
+    actorVerifier: {
+      verify: async () => {
+        throw new InternalAuthenticationError();
+      },
+    },
+    projects,
+    graph,
+    members,
+    roleRates: {
+      ...roleRates,
+      upsert: async () => {
+        repositoryCalls += 1;
+        throw new Error("must not be called");
+      },
+    },
+  });
+
+  const response = await app.request("/internal/v1/role-rates", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": "role-rate-upsert-0000000000000003",
+    },
+    body: JSON.stringify({
+      organizationId: "550e8400-e29b-41d4-a716-446655440005",
+      role: "development",
+      hourlyRateMXN: 750,
+    }),
+  });
+
+  assert.equal(response.status, 401);
+  assert.equal(repositoryCalls, 0);
 });

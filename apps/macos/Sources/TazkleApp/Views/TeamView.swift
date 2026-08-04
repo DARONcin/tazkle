@@ -1,8 +1,11 @@
 import SwiftUI
+import TazkleAuthentication
 import TazkleDesignSystem
+import TazkleDomain
 
 struct TeamView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var authentication: AuthenticationController
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.tazkleHighContrast) private var highContrast
 
@@ -18,41 +21,14 @@ struct TeamView: View {
                     subtitle: subtitle,
                     systemImage: "person.2",
                     accent: TazkleColors.relationship,
-                    contextBadgeTitle: "Sin datos conectados",
-                    contextBadgeSystemImage: "externaldrive.badge.questionmark",
-                    contextBadgeHelp: "El equipo aparecerá cuando Project Core entregue miembros, roles y capacidad reales."
+                    trailingTitle: canRetry ? "Actualizar" : nil,
+                    trailingAction: canRetry ? { Task { await loadTeam() } } : nil,
+                    contextBadgeTitle: headerBadge.title,
+                    contextBadgeSystemImage: headerBadge.systemImage,
+                    contextBadgeHelp: headerBadge.help
                 )
 
-                ProjectSectionCard(
-                    title: "Todavía no hay datos de equipo",
-                    systemImage: "person.2.slash"
-                ) {
-                    Label(
-                        "Tazkle no mostrará personas, roles, horas ni asignaciones de ejemplo.",
-                        systemImage: "checkmark.shield"
-                    )
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(TazkleColors.success)
-
-                    Text(emptyStateDetail)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    HStack {
-                        ProjectStatusPill(
-                            title: "Sin datos conectados",
-                            systemImage: "person.crop.circle.badge.questionmark",
-                            color: TazkleColors.relationship
-                        )
-                        Spacer()
-                        Button("Revisar cuenta") {
-                            appState.selectSection(.settings)
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                }
-                .frame(maxWidth: 760)
+                content
             }
             .padding(TazkleSpacing.xLarge)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -63,6 +39,104 @@ struct TeamView: View {
                 highContrast: highContrast
             )
         )
+        .task {
+            guard appState.teamLoadState == .idle else { return }
+            await loadTeam()
+        }
+    }
+
+    private func loadTeam() async {
+        await appState.loadTeamMembers(using: authentication)
+    }
+
+    private var canRetry: Bool {
+        switch appState.teamLoadState {
+        case .loaded, .offline, .error: true
+        case .idle, .loading: false
+        }
+    }
+
+    private var headerBadge: (title: String, systemImage: String, help: String) {
+        switch appState.teamLoadState {
+        case .idle, .loading:
+            ("Cargando", "arrow.triangle.2.circlepath", "Consultando los miembros reales de tu organización.")
+        case .offline:
+            ("Sin conexión", "wifi.slash", "No se pudo contactar al servidor; el equipo se actualizará al recuperar conexión.")
+        case .error:
+            ("Error al cargar", "exclamationmark.triangle", "No fue posible consultar el equipo real.")
+        case .loaded:
+            ("Datos reales", "checkmark.shield", "Miembros y roles obtenidos de tu organización en Project Core.")
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch appState.teamLoadState {
+        case .idle, .loading:
+            statusCard(
+                title: "Cargando el equipo…",
+                systemImage: "arrow.triangle.2.circlepath",
+                detail: "Consultando los miembros reales de tu organización.",
+                isBusy: true
+            )
+        case .offline:
+            statusCard(
+                title: "Sin conexión",
+                systemImage: "wifi.slash",
+                detail: "No se pudo contactar al servidor. El equipo se actualizará automáticamente al recuperar conexión, o pulsa Actualizar para reintentar."
+            )
+        case let .error(message):
+            statusCard(
+                title: "No fue posible cargar el equipo",
+                systemImage: "exclamationmark.triangle",
+                detail: message
+            )
+        case .loaded:
+            if appState.teamMembers.isEmpty {
+                statusCard(
+                    title: "Todavía no hay miembros",
+                    systemImage: "person.2.slash",
+                    detail: "Invita personas a tu organización desde Configuración para verlas aquí."
+                )
+            } else {
+                membersCard
+            }
+        }
+    }
+
+    private func statusCard(
+        title: String,
+        systemImage: String,
+        detail: String,
+        isBusy: Bool = false
+    ) -> some View {
+        ProjectSectionCard(title: title, systemImage: systemImage) {
+            if isBusy {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityHidden(true)
+            }
+            Text(detail)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: 760)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var membersCard: some View {
+        ProjectSectionCard(title: "Miembros (\(appState.teamMembers.count))", systemImage: "person.2") {
+            VStack(spacing: 0) {
+                ForEach(Array(appState.teamMembers.enumerated()), id: \.element.id) { index, member in
+                    if index > 0 {
+                        Divider()
+                    }
+                    MemberRow(member: member)
+                }
+            }
+        }
+        .frame(maxWidth: 760)
     }
 
     private var subtitle: String {
@@ -79,19 +153,56 @@ struct TeamView: View {
             "Cobertura, capacidad y asignaciones basadas en datos reales."
         }
     }
+}
 
-    private var emptyStateDetail: String {
-        switch destinationID {
-        case "team.coverage":
-            "La cobertura aparecerá cuando la organización y sus responsabilidades se sincronicen con Project Core."
-        case "team.capacity":
-            "La capacidad se calculará cuando existan miembros, disponibilidad y asignaciones confirmadas."
-        case "team.assignments":
-            "Las asignaciones aparecerán cuando un miembro real sea responsable de un bloque o una tarea."
-        case "team.pending":
-            "Las brechas se detectarán a partir de los roles requeridos por el proyecto y de las personas disponibles."
-        default:
-            "Conecta una organización para calcular cobertura, carga y asignaciones dentro de la sesión actual."
+private struct MemberRow: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.tazkleHighContrast) private var highContrast
+    let member: OrganizationMember
+
+    var body: some View {
+        HStack(spacing: TazkleSpacing.medium) {
+            ZStack {
+                Circle()
+                    .fill(TazkleColors.relationship.opacity(0.16))
+                    .frame(width: 36, height: 36)
+                Text(initials)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(TazkleColors.relationship)
+            }
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(member.displayName ?? "Sin nombre")
+                    .font(.callout.weight(.semibold))
+                if member.status != .active {
+                    Text(member.status.displayName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            Text(member.role.displayName)
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, TazkleSpacing.medium)
+                .padding(.vertical, TazkleSpacing.xSmall)
+                .background(
+                    TazkleColors.elevated(for: colorScheme, highContrast: highContrast)
+                )
+                .clipShape(Capsule())
         }
+        .padding(.vertical, TazkleSpacing.medium)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(member.displayName ?? "Sin nombre"), \(member.role.displayName)\(member.status != .active ? ", \(member.status.displayName)" : "")")
+    }
+
+    private var initials: String {
+        let name = member.displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let name, !name.isEmpty else { return "?" }
+        let parts = name.split(separator: " ")
+        let letters = parts.prefix(2).compactMap { $0.first }
+        return String(letters).uppercased()
     }
 }

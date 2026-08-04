@@ -143,10 +143,31 @@ function accountPage(
               ${
                 isSignUp
                   ? `<p class="field-help">Usa al menos 12 caracteres. Tazkle nunca recibe esta contraseña en la app de macOS.</p>`
-                  : ""
+                  : `<button id="forgot-password-link" class="link-button" type="button">¿Olvidaste tu contraseña?</button>`
               }
               <button class="button primary" type="submit">${submitText}</button>
             </form>
+            ${
+              isSignUp
+                ? ""
+                : `<form id="forgot-password-form" hidden>
+                    <p class="step-copy">Escribe el correo de tu cuenta y te enviaremos un código para restablecer tu contraseña.</p>
+                    <label for="forgot-email">Correo</label>
+                    <input id="forgot-email" name="forgot-email" type="email" inputmode="email" autocomplete="email" maxlength="320" required />
+                    <button class="button primary" type="submit">Enviar código</button>
+                    <button id="cancel-forgot-password" class="button secondary" type="button">Volver a iniciar sesión</button>
+                  </form>
+                  <form id="reset-password-form" hidden>
+                    <p id="reset-password-instructions" class="step-copy"></p>
+                    <label for="reset-otp">Código de seguridad</label>
+                    <input id="reset-otp" name="otp" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required />
+                    <label for="new-password">Contraseña nueva</label>
+                    <input id="new-password" name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required />
+                    <p class="field-help">Usa al menos 12 caracteres.</p>
+                    <button class="button primary" type="submit">Restablecer contraseña</button>
+                    <button id="resend-reset-code" class="button secondary" type="button">Enviar un código nuevo</button>
+                  </form>`
+            }
             <form id="otp-form" hidden>
               <p id="otp-instructions" class="step-copy"></p>
               <label for="otp">Código de seguridad</label>
@@ -215,7 +236,7 @@ function documentShell({
     .recovery-codes { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:16px 0; padding:0; list-style:none; }
     .recovery-codes li { padding:9px 10px; border:1px solid var(--line); border-radius:9px; background:rgb(9 22 32); font:600 14px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace; text-align:center; }
     .button { min-height:44px; margin-top:8px; padding:10px 16px; border:0; border-radius:11px; font-weight:700; cursor:pointer; }
-    .button:focus-visible,.alternate:focus-visible { outline:3px solid rgba(109,214,231,.45); outline-offset:3px; }
+    .button:focus-visible,.alternate:focus-visible,.link-button:focus-visible { outline:3px solid rgba(109,214,231,.45); outline-offset:3px; }
     .button:disabled { cursor:progress; opacity:.66; }
     .primary { color:white; background:linear-gradient(135deg,var(--blue),var(--purple)); }
     .danger { color:white; background:rgb(190 48 59); }
@@ -229,6 +250,8 @@ function documentShell({
     .divider { display:flex; align-items:center; gap:12px; margin:20px 0 14px; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
     .divider::before,.divider::after { content:""; height:1px; flex:1; background:var(--line); }
     .alternate { display:block; width:max-content; margin:20px auto 0; color:rgb(157 181 255); text-decoration:none; }
+    .link-button { width:max-content; margin:2px 0 0; padding:0; color:rgb(157 181 255); background:none; border:0; font-weight:600; cursor:pointer; }
+    .link-button:hover { text-decoration:underline; }
     .status { margin:4px 0 0; color:rgb(255 210 122); }
     .scope-list { margin:0 0 22px; padding-left:22px; color:var(--muted); }
     .scope-list li + li { margin-top:8px; }

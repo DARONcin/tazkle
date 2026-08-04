@@ -239,6 +239,46 @@ assert(
   "another actor must not read a graph outside their organization",
 );
 
+const userBOwnProject = await request(
+  "domain-smoke-user-b",
+  "/internal/v1/projects",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": `domain-smoke-b-${randomUUID()}`,
+    },
+    body: JSON.stringify(createCommand),
+  },
+);
+assert(
+  userBOwnProject.response.status === 201,
+  "user B must be able to create a project in their own personal organization",
+);
+const userAID = created.body.project.responsibleUserId;
+const userBID = userBOwnProject.body.project.responsibleUserId;
+
+const userAMembers = await request("domain-smoke-user-a", "/internal/v1/members");
+assert(userAMembers.response.status === 200, "member list must return 200");
+assert(
+  userAMembers.body.members.some((member) => member.userId === userAID),
+  "an actor must see their own membership",
+);
+assert(
+  !userAMembers.body.members.some((member) => member.userId === userBID),
+  "an actor must not see a teammate from a different organization",
+);
+
+const userBMembers = await request("domain-smoke-user-b", "/internal/v1/members");
+assert(
+  userBMembers.body.members.some((member) => member.userId === userBID),
+  "the other actor must see their own membership",
+);
+assert(
+  !userBMembers.body.members.some((member) => member.userId === userAID),
+  "the other actor must not see a teammate from a different organization",
+);
+
 console.info("project-domain-smoke: passed");
 
 function encode(value) {

@@ -1,6 +1,7 @@
 import SwiftUI
 import TazkleAuthentication
 import TazkleDesignSystem
+import TazkleDomain
 
 struct AccountOrganizationView: View {
     @EnvironmentObject private var appState: AppState
@@ -24,10 +25,12 @@ struct AccountOrganizationView: View {
 
                 switch destinationID {
                 case "settings.availability", "settings.organization",
-                     "settings.members", "settings.permissions", "settings.rates":
+                     "settings.members", "settings.permissions":
                     ConnectedAccountDomainUnavailableView(
                         destinationID: destinationID
                     )
+                case "settings.rates":
+                    RoleRatesSettingsView()
                 case "settings.notifications":
                     NotificationSettingsView()
                 case "settings.appearance":
@@ -417,7 +420,6 @@ private struct ConnectedAccountDomainUnavailableView: View {
         case "settings.availability": "Disponibilidad pendiente"
         case "settings.members": "Directorio pendiente"
         case "settings.permissions": "Permisos pendientes"
-        case "settings.rates": "Tarifas pendientes"
         default: "Organización pendiente"
         }
     }
@@ -427,7 +429,6 @@ private struct ConnectedAccountDomainUnavailableView: View {
         case "settings.availability": "calendar.badge.clock"
         case "settings.members": "person.2.slash"
         case "settings.permissions": "lock.badge.clock"
-        case "settings.rates": "banknote"
         default: "building.2"
         }
     }
@@ -440,8 +441,6 @@ private struct ConnectedAccountDomainUnavailableView: View {
             "Los miembros se obtendrán de Project Core; no se mostrarán personas de demostración."
         case "settings.permissions":
             "Los permisos efectivos dependerán de roles reales y de autorización del servidor."
-        case "settings.rates":
-            "Las tarifas internas se mostrarán sólo con permisos financieros y datos de la organización."
         default:
             "Crea o conecta una organización para definir propiedad, responsables y políticas."
         }
@@ -782,7 +781,7 @@ private struct OrganizationSettingsView: View {
             SettingsValueRow(
                 title: "Responsable final",
                 detail: "Resuelve aprobaciones cuando la política lo permite",
-                value: "Carlos Ruiz",
+                value: "Sin datos conectados",
                 systemImage: "person.badge.key"
             )
         }
@@ -794,79 +793,119 @@ private struct OrganizationSettingsView: View {
             SettingsValueRow(title: "Plan", detail: "Escenario conceptual", value: "Equipo", systemImage: "crown")
             SettingsValueRow(title: "Miembros", detail: "Incluye una invitación", value: "6", systemImage: "person.3")
             SettingsValueRow(title: "Proyectos activos", detail: "Un propietario por proyecto", value: "3", systemImage: "folder")
-            SettingsValueRow(title: "Responsable", detail: "Puede transferirse con aprobación", value: "Carlos Ruiz", systemImage: "person.badge.key")
+            SettingsValueRow(title: "Responsable", detail: "Puede transferirse con aprobación", value: "Sin datos conectados", systemImage: "person.badge.key")
         }
         .frame(maxWidth: 420, alignment: .top)
     }
 }
 
 private struct MembersSettingsView: View {
+    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var authentication: AuthenticationController
     @State private var search = ""
-    @State private var invitationPrepared = false
 
-    private var members: [AccountPrototype.Member] {
-        guard !search.isEmpty else { return AccountPrototype.members }
-        return AccountPrototype.members.filter {
-            $0.name.localizedCaseInsensitiveContains(search)
-                || $0.role.localizedCaseInsensitiveContains(search)
+    private var members: [OrganizationMember] {
+        guard !search.isEmpty else { return appState.teamMembers }
+        return appState.teamMembers.filter {
+            ($0.displayName ?? "").localizedCaseInsensitiveContains(search)
+                || $0.role.displayName.localizedCaseInsensitiveContains(search)
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: TazkleSpacing.xLarge) {
-            LazyVGrid(columns: ProjectGridLayout.equalColumns(3), spacing: TazkleSpacing.medium) {
-                ProjectMetricCard(title: "Miembros", value: "5", detail: "Acceso activo", systemImage: "person.3.fill", accent: TazkleColors.relationship)
-                ProjectMetricCard(title: "Invitaciones", value: "1", detail: "Pendiente de aceptar", systemImage: "envelope.badge", accent: TazkleColors.warning)
-                ProjectMetricCard(title: "Roles sin cubrir", value: "1", detail: "Diseño requiere responsable", systemImage: "person.crop.circle.badge.questionmark", accent: TazkleColors.warning)
+            switch appState.teamLoadState {
+            case .idle, .loading:
+                AccountNotice(
+                    title: "Cargando miembros",
+                    detail: "Consultando la organización real desde Project Core.",
+                    systemImage: "arrow.triangle.2.circlepath",
+                    color: TazkleColors.relationship
+                )
+            case .offline:
+                AccountNotice(
+                    title: "Sin conexión",
+                    detail: "El directorio se actualizará automáticamente al recuperar conexión.",
+                    systemImage: "wifi.slash",
+                    color: TazkleColors.warning
+                )
+            case let .error(message):
+                AccountNotice(
+                    title: "No fue posible cargar el directorio",
+                    detail: message,
+                    systemImage: "exclamationmark.triangle.fill",
+                    color: TazkleColors.warning
+                )
+            case .loaded:
+                ProjectMetricCard(
+                    title: "Miembros",
+                    value: "\(appState.teamMembers.count)",
+                    detail: "Acceso activo en tu organización",
+                    systemImage: "person.3.fill",
+                    accent: TazkleColors.relationship
+                )
+                .frame(maxWidth: 320)
             }
 
             ProjectSectionCard(title: "Directorio", systemImage: "person.3") {
-                HStack {
-                    TextField("Buscar persona o rol", text: $search)
-                        .accountFieldSurface()
-                    Button("Preparar invitación") { invitationPrepared = true }
-                        .buttonStyle(.borderedProminent)
-                        .tint(TazkleColors.relationship)
-                }
+                TextField("Buscar persona o rol", text: $search)
+                    .accountFieldSurface()
 
-                if invitationPrepared {
-                    Label("Invitación preparada localmente; no se envió ningún correo", systemImage: "internaldrive")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(TazkleColors.warning)
+                Label(
+                    "Invitar personas todavía no está conectado a Project Core.",
+                    systemImage: "envelope.badge.shield.half.filled"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+                if appState.teamLoadState == .loaded, members.isEmpty {
+                    Text(
+                        search.isEmpty
+                            ? "Todavía no hay miembros en tu organización."
+                            : "Ninguna persona coincide con “\(search)”."
+                    )
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
                 }
 
                 ForEach(members) { member in
                     ProjectListRow {
                         HStack(spacing: TazkleSpacing.medium) {
                             ZStack {
-                                Circle().fill(member.color.opacity(0.18))
-                                Text(member.initials)
+                                Circle().fill(TazkleColors.relationship.opacity(0.18))
+                                Text(initials(for: member))
                                     .font(.caption.weight(.bold))
-                                    .foregroundStyle(member.color)
+                                    .foregroundStyle(TazkleColors.relationship)
                             }
                             .frame(width: 34, height: 34)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(member.name)
-                                    .font(.callout.weight(.semibold))
-                                Text(member.email)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                            Text(member.displayName ?? "Sin nombre")
+                                .font(.callout.weight(.semibold))
                         }
                     } trailing: {
                         HStack(spacing: TazkleSpacing.medium) {
-                            Text(member.role)
+                            Text(member.role.displayName)
                                 .font(.callout)
                             ProjectStatusPill(
-                                title: member.status,
-                                systemImage: member.status == "Activo" ? "checkmark.circle.fill" : "clock.fill",
-                                color: member.status == "Activo" ? TazkleColors.success : TazkleColors.warning
+                                title: member.status.displayName,
+                                systemImage: member.status == .active ? "checkmark.circle.fill" : "clock.fill",
+                                color: member.status == .active ? TazkleColors.success : TazkleColors.warning
                             )
                         }
                     }
                 }
             }
         }
+        .task {
+            guard appState.teamLoadState == .idle else { return }
+            await appState.loadTeamMembers(using: authentication)
+        }
+    }
+
+    private func initials(for member: OrganizationMember) -> String {
+        let name = member.displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let name, !name.isEmpty else { return "?" }
+        let letters = name.split(separator: " ").prefix(2).compactMap { $0.first }
+        return String(letters).uppercased()
     }
 }
 
@@ -978,58 +1017,129 @@ private struct TemplateSettingsView: View {
     }
 }
 
-private struct RatesSettingsView: View {
-    @State private var reserve = 15.0
-    @State private var currency = "MXN"
+private struct RoleRatesSettingsView: View {
+    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var authentication: AuthenticationController
 
     var body: some View {
         VStack(alignment: .leading, spacing: TazkleSpacing.xLarge) {
-            AccountNotice(
-                title: "Tarifas internas protegidas",
-                detail: "El prototipo muestra datos ficticios. La autorización por campo y la separación del precio al cliente aún no están conectadas a Project Core.",
-                systemImage: "exclamationmark.shield.fill",
-                color: TazkleColors.warning
-            )
-
-            LazyVGrid(columns: ProjectGridLayout.equalColumns(3), spacing: TazkleSpacing.medium) {
-                ProjectMetricCard(title: "Moneda base", value: currency, detail: "Predeterminada del espacio", systemImage: "pesosign.circle", accent: TazkleColors.warning)
-                ProjectMetricCard(title: "Reserva", value: "\(Int(reserve))%", detail: "Riesgos e imprevistos", systemImage: "shield", accent: TazkleColors.warning)
-                ProjectMetricCard(title: "Precio al cliente", value: "Separado", detail: "No revela costos internos", systemImage: "tag", accent: TazkleColors.success)
+            switch appState.roleRatesLoadState {
+            case .idle, .loading:
+                AccountNotice(
+                    title: "Cargando tarifas",
+                    detail: "Consultando la organización real desde Project Core.",
+                    systemImage: "arrow.triangle.2.circlepath",
+                    color: TazkleColors.relationship
+                )
+            case .offline:
+                AccountNotice(
+                    title: "Sin conexión",
+                    detail: "Las tarifas se actualizarán automáticamente al recuperar conexión.",
+                    systemImage: "wifi.slash",
+                    color: TazkleColors.warning
+                )
+            case let .error(message):
+                AccountNotice(
+                    title: "No fue posible cargar las tarifas",
+                    detail: message,
+                    systemImage: "exclamationmark.triangle.fill",
+                    color: TazkleColors.warning
+                )
+            case .loaded:
+                ProjectMetricCard(
+                    title: "Tarifas capturadas",
+                    value: "\(appState.roleRates.count)",
+                    detail: "De \(OrganizationRole.allCases.count) roles posibles",
+                    systemImage: "banknote",
+                    accent: TazkleColors.warning
+                )
+                .frame(maxWidth: 320)
             }
 
             ProjectSectionCard(title: "Tarifas por rol", systemImage: "person.2") {
-                HStack {
-                    Picker("Moneda", selection: $currency) {
-                        Text("MXN").tag("MXN")
-                        Text("USD").tag("USD")
-                    }
-                    .frame(maxWidth: 220)
-                    Spacer()
-                    Stepper("Reserva: \(Int(reserve))%", value: $reserve, in: 0...40, step: 5)
+                Text("Tarifa interna en MXN por hora, capturada a mano por un administrador. No es visible para el cliente.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if appState.currentOrganizationID == nil, appState.roleRatesLoadState == .loaded {
+                    Text("Todavía no se pudo determinar tu organización; agrega primero un miembro del equipo desde Miembros y roles.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                 }
 
-                ForEach(AccountPrototype.rates) { rate in
-                    ProjectListRow {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(rate.role)
-                                .font(.callout.weight(.medium))
-                            Text(rate.source)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    } trailing: {
-                        Text(rate.amount)
-                            .font(.callout.monospacedDigit().weight(.semibold))
-                    }
+                ForEach(OrganizationRole.allCases) { role in
+                    RoleRateRow(role: role)
                 }
-            }
 
-            ProjectSectionCard(title: "Costos adicionales", systemImage: "shippingbox") {
-                SettingsValueRow(title: "Licencias", detail: "Costo fijo o periódico", value: "Por proyecto", systemImage: "key")
-                SettingsValueRow(title: "Infraestructura", detail: "Consumo estimado y real", value: "Mensual", systemImage: "server.rack")
-                SettingsValueRow(title: "Margen", detail: "Solo dirección y finanzas", value: "Privado", systemImage: "chart.line.uptrend.xyaxis", valueColor: TazkleColors.warning)
+                if case let .error(message) = appState.roleRateSaveState {
+                    Label(message, systemImage: "exclamationmark.circle")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(TazkleColors.warning)
+                        .accessibilityElement(children: .combine)
+                }
             }
         }
+        .task {
+            guard appState.roleRatesLoadState == .idle else { return }
+            await appState.loadRoleRates(using: authentication)
+        }
+    }
+}
+
+private struct RoleRateRow: View {
+    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var authentication: AuthenticationController
+    let role: OrganizationRole
+
+    @State private var draftValue = ""
+    @FocusState private var isFocused: Bool
+
+    private var savedRate: RoleRate? {
+        appState.roleRates.first { $0.role == role }
+    }
+
+    private var isSaving: Bool {
+        appState.roleRateSaveState == .saving
+    }
+
+    private var hasChange: Bool {
+        guard let value = Int(draftValue), value >= 0 else { return false }
+        return value != savedRate?.hourlyRateMXN
+    }
+
+    var body: some View {
+        ProjectListRow {
+            Text(role.displayName)
+                .font(.callout.weight(.medium))
+        } trailing: {
+            HStack(spacing: TazkleSpacing.small) {
+                TextField("Sin definir", text: $draftValue)
+                    .accountFieldSurface()
+                    .frame(width: 90)
+                    .multilineTextAlignment(.trailing)
+                    .focused($isFocused)
+                    .onSubmit { Task { await save() } }
+                    .accessibilityLabel("Tarifa de \(role.displayName) en MXN por hora")
+                Text("MXN/h")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Guardar") { Task { await save() } }
+                    .disabled(isSaving || !hasChange || appState.currentOrganizationID == nil)
+            }
+        }
+        .onAppear { syncDraft() }
+        .onChange(of: savedRate) { _, _ in
+            if !isFocused { syncDraft() }
+        }
+    }
+
+    private func syncDraft() {
+        draftValue = savedRate.map { String($0.hourlyRateMXN) } ?? ""
+    }
+
+    private func save() async {
+        guard let value = Int(draftValue), value >= 0 else { return }
+        await appState.saveRoleRate(role: role, hourlyRateMXN: value, using: authentication)
     }
 }
 
@@ -1377,16 +1487,6 @@ private enum AccountPrototype {
         let keys: String
     }
 
-    struct Member: Identifiable {
-        let id = UUID()
-        let name: String
-        let initials: String
-        let email: String
-        let role: String
-        let status: String
-        let color: Color
-    }
-
     struct Permission: Identifiable {
         let id = UUID()
         let area: String
@@ -1399,13 +1499,6 @@ private enum AccountPrototype {
     struct PermissionRow {
         let role: String
         let permissions: [Permission]
-    }
-
-    struct Rate: Identifiable {
-        let id = UUID()
-        let role: String
-        let source: String
-        let amount: String
     }
 
     struct SyncState {
@@ -1430,15 +1523,6 @@ private enum AccountPrototype {
         Shortcut(action: "Volver al origen", context: "Lienzo", keys: "⌘0"),
         Shortcut(action: "Ajustar mapa a ventana", context: "Lienzo", keys: "⇧⌘F"),
         Shortcut(action: "Referencia de atajos", context: "Global", keys: "⌘/"),
-    ]
-
-    static let members = [
-        Member(name: "Carlos Ruiz", initials: "CR", email: "daroncin@hotmail.com", role: "Responsable del proyecto", status: "Activo", color: TazkleColors.relationship),
-        Member(name: "Ana Torres", initials: "AT", email: "ana@tazkle.local", role: "Desarrollo", status: "Activo", color: TazkleColors.actionPrimary),
-        Member(name: "Diego Luna", initials: "DL", email: "diego@tazkle.local", role: "Producto", status: "Activo", color: TazkleColors.assistantProposal),
-        Member(name: "María Soto", initials: "MS", email: "maria@tazkle.local", role: "Finanzas", status: "Activo", color: TazkleColors.warning),
-        Member(name: "Lucía Vega", initials: "LV", email: "lucia@tazkle.local", role: "QA", status: "Activo", color: TazkleColors.success),
-        Member(name: "Invitación pendiente", initials: "DI", email: "diseno@tazkle.local", role: "Diseño", status: "Invitado", color: TazkleColors.warning),
     ]
 
     static let permissionRows = [
@@ -1466,14 +1550,6 @@ private enum AccountPrototype {
             Permission(area: "Costos internos", detail: "Nunca se exponen.", level: "Sin acceso", systemImage: "lock.fill", color: TazkleColors.warning),
             Permission(area: "Precio aprobado", detail: "Visible cuando se comparte.", level: "Lectura", systemImage: "eye.fill", color: TazkleColors.relationship),
         ]),
-    ]
-
-    static let rates = [
-        Rate(role: "Producto", source: "Tarifa de organización", amount: "$750 / h"),
-        Rate(role: "Diseño", source: "Tarifa de organización", amount: "$680 / h"),
-        Rate(role: "Desarrollo", source: "Tarifa de organización", amount: "$820 / h"),
-        Rate(role: "QA", source: "Tarifa de organización", amount: "$620 / h"),
-        Rate(role: "Arquitectura", source: "Tarifa de organización", amount: "$980 / h"),
     ]
 
     static let syncStates = [

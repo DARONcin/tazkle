@@ -4,11 +4,15 @@ import {
   errorEnvelopeSchema,
   HTTP_HEADERS,
   idempotencyKeySchema,
+  membersListResponseSchema,
   platformCapabilitiesSchema,
   projectGraphResponseSchema,
   projectListResponseSchema,
   replaceProjectGraphCommandSchema,
+  roleRatesListResponseSchema,
   serviceCapabilitySchema,
+  upsertRoleRateCommandSchema,
+  upsertRoleRateResponseSchema,
   type HealthResponse,
   type ServiceCapability,
 } from "@tazkle/platform-contracts";
@@ -266,6 +270,84 @@ export function createGatewayApp({
         fetchImplementation,
       );
       return proxyProjectResponse(context, response, projectGraphResponseSchema);
+    } catch (error) {
+      return gatewayOperationError(context, error);
+    }
+  });
+
+  app.get("/v1/members", async (context) => {
+    try {
+      requireJSONAccept(context.req.header("Accept"));
+      const internalToken = await authenticateAndSign(
+        context,
+        accessTokens,
+        internalActors,
+      );
+      const response = await fetchInternal(
+        new URL("/internal/v1/members", urls.projectCore),
+        {
+          method: "GET",
+          headers: internalHeaders(internalToken),
+        },
+        fetchImplementation,
+      );
+      return proxyProjectResponse(context, response, membersListResponseSchema);
+    } catch (error) {
+      return gatewayOperationError(context, error);
+    }
+  });
+
+  app.get("/v1/role-rates", async (context) => {
+    try {
+      requireJSONAccept(context.req.header("Accept"));
+      const internalToken = await authenticateAndSign(
+        context,
+        accessTokens,
+        internalActors,
+      );
+      const response = await fetchInternal(
+        new URL("/internal/v1/role-rates", urls.projectCore),
+        {
+          method: "GET",
+          headers: internalHeaders(internalToken),
+        },
+        fetchImplementation,
+      );
+      return proxyProjectResponse(context, response, roleRatesListResponseSchema);
+    } catch (error) {
+      return gatewayOperationError(context, error);
+    }
+  });
+
+  app.put("/v1/role-rates", async (context) => {
+    try {
+      requireJSONAccept(context.req.header("Accept"));
+      requireJSONContentType(context.req.header("Content-Type"));
+      const idempotencyKey = idempotencyKeySchema.parse(
+        context.req.header(HTTP_HEADERS.idempotencyKey),
+      );
+      const internalToken = await authenticateAndSign(
+        context,
+        accessTokens,
+        internalActors,
+      );
+      const command = upsertRoleRateCommandSchema.parse(
+        await context.req.json(),
+      );
+      const response = await fetchInternal(
+        new URL("/internal/v1/role-rates", urls.projectCore),
+        {
+          method: "PUT",
+          headers: {
+            ...internalHeaders(internalToken),
+            "Content-Type": "application/json",
+            [HTTP_HEADERS.idempotencyKey]: idempotencyKey,
+          },
+          body: JSON.stringify(command),
+        },
+        fetchImplementation,
+      );
+      return proxyProjectResponse(context, response, upsertRoleRateResponseSchema);
     } catch (error) {
       return gatewayOperationError(context, error);
     }
