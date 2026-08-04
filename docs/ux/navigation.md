@@ -135,8 +135,10 @@ Sidebar de navegación | Contenido principal | Inspector contextual
 - Perfil y Organización siguen los dos mockups aprobados bajo
   `design/approved/mockups/account/`; las demás subvistas reutilizan su jerarquía
   de bandas, campos y paneles sin añadir una tercera barra lateral.
-- Apariencia y Notificaciones son preferencias locales de esta Mac. Mientras no
-  exista identidad ni Project Core, los demás apartados se identifican como
+- Apariencia y Notificaciones son preferencias locales de esta Mac. Miembros y
+  roles y Costos y tarifas ya consultan Project Core (lectura real en ambas;
+  escritura real sólo en Costos y tarifas, restringida a organization-admin).
+  Mientras el resto de los apartados no esté conectado, se identifican como
   escenarios de prototipo y sus acciones no simulan invitaciones, sesiones,
   cambios remotos ni sincronización.
 - Los costos internos permanecen separados del precio al cliente. La matriz de
