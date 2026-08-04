@@ -16,6 +16,7 @@ const app = createProjectCoreApp({
   projects: database.projects,
   graph: database.graph,
   members: database.members,
+  roleRates: database.roleRates,
 });
 
 startService(app, "project-core");

@@ -3,6 +3,7 @@ import TazkleDomain
 
 enum PlatformAPIError: Error, Equatable {
     case unauthorized
+    case forbidden
     case network
     case server(status: Int)
     case decoding
@@ -20,6 +21,23 @@ struct PlatformAPIClient {
         return response.members
     }
 
+    func fetchRoleRates(accessToken: String) async throws -> [RoleRate] {
+        let response: RoleRatesListResponse = try await get("v1/role-rates", accessToken: accessToken)
+        return response.rates
+    }
+
+    func upsertRoleRate(
+        _ command: UpsertRoleRateCommand,
+        accessToken: String
+    ) async throws -> RoleRate {
+        let response: UpsertRoleRateResponse = try await put(
+            "v1/role-rates",
+            body: command,
+            accessToken: accessToken
+        )
+        return response.rate
+    }
+
     private func get<Response: Decodable>(
         _ path: String,
         accessToken: String
@@ -30,6 +48,30 @@ struct PlatformAPIClient {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
+        return try await send(request)
+    }
+
+    private func put<Body: Encodable, Response: Decodable>(
+        _ path: String,
+        body: Body,
+        accessToken: String
+    ) async throws -> Response {
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        request.httpMethod = "PUT"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(UUID().uuidString, forHTTPHeaderField: "Idempotency-Key")
+        request.httpBody = try JSONEncoder().encode(body)
+
+        return try await send(request, acceptableStatusCodes: [200, 201])
+    }
+
+    private func send<Response: Decodable>(
+        _ request: URLRequest,
+        acceptableStatusCodes: Set<Int> = [200]
+    ) async throws -> Response {
         let data: Data
         let response: URLResponse
         do {
@@ -41,9 +83,12 @@ struct PlatformAPIClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw PlatformAPIError.network
         }
-        guard httpResponse.statusCode == 200 else {
+        guard acceptableStatusCodes.contains(httpResponse.statusCode) else {
             if httpResponse.statusCode == 401 {
                 throw PlatformAPIError.unauthorized
+            }
+            if httpResponse.statusCode == 403 {
+                throw PlatformAPIError.forbidden
             }
             throw PlatformAPIError.server(status: httpResponse.statusCode)
         }

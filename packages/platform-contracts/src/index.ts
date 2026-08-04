@@ -340,6 +340,44 @@ export const membersListResponseSchema = z
 
 export type MembersListResponse = z.infer<typeof membersListResponseSchema>;
 
+export const roleRateSchema = z
+  .object({
+    organizationId: z.string().uuid(),
+    role: organizationRoleSchema,
+    hourlyRateMXN: z.number().int().min(0).max(100_000),
+    updatedAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
+
+export type RoleRate = z.infer<typeof roleRateSchema>;
+
+export const roleRatesListResponseSchema = z
+  .object({
+    rates: z.array(roleRateSchema).max(1_000),
+  })
+  .strict();
+
+export type RoleRatesListResponse = z.infer<typeof roleRatesListResponseSchema>;
+
+export const upsertRoleRateCommandSchema = z
+  .object({
+    organizationId: z.string().uuid(),
+    role: organizationRoleSchema,
+    hourlyRateMXN: z.number().int().min(0).max(100_000),
+  })
+  .strict();
+
+export type UpsertRoleRateCommand = z.infer<typeof upsertRoleRateCommandSchema>;
+
+export const upsertRoleRateResponseSchema = z
+  .object({
+    rate: roleRateSchema,
+    replayed: z.boolean(),
+  })
+  .strict();
+
+export type UpsertRoleRateResponse = z.infer<typeof upsertRoleRateResponseSchema>;
+
 export const externalActorSchema = z
   .object({
     issuer: z.string().url().max(512),

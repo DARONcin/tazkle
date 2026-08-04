@@ -197,6 +197,20 @@ enum TeamLoadState: Equatable {
     case error(String)
 }
 
+enum RoleRatesLoadState: Equatable {
+    case idle
+    case loading
+    case loaded
+    case offline
+    case error(String)
+}
+
+enum RoleRateSaveState: Equatable {
+    case idle
+    case saving
+    case error(String)
+}
+
 @MainActor
 final class AppState: ObservableObject {
     @Published var graph: ProjectGraph
@@ -235,6 +249,9 @@ final class AppState: ObservableObject {
     @Published var isPresentingProductTour = false
     @Published private(set) var teamMembers: [OrganizationMember] = []
     @Published private(set) var teamLoadState: TeamLoadState = .idle
+    @Published private(set) var roleRates: [RoleRate] = []
+    @Published private(set) var roleRatesLoadState: RoleRatesLoadState = .idle
+    @Published private(set) var roleRateSaveState: RoleRateSaveState = .idle
 
     private var store: SQLiteProjectStore?
     private(set) var activeWorkspaceAccountID: String?
@@ -335,6 +352,83 @@ final class AppState: ObservableObject {
             teamLoadState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
         } catch {
             teamLoadState = .error("No fue posible cargar el equipo. Inténtalo nuevamente.")
+        }
+    }
+
+    /// Best-effort current organization: the client has no organization
+    /// picker yet, so this borrows whichever organization the team roster or
+    /// an existing rate already resolved, matching every other real-data
+    /// surface's single-organization assumption for this first slice.
+    var currentOrganizationID: UUID? {
+        roleRates.first?.organizationId ?? teamMembers.first?.organizationId
+    }
+
+    func loadRoleRates(using authentication: AuthenticationController) async {
+        guard let issuer = authentication.configuration?.issuer,
+              let baseURL = URL.platformGatewayBaseURL(fromIssuer: issuer)
+        else {
+            roleRatesLoadState = .error("No hay una sesión configurada para cargar las tarifas.")
+            return
+        }
+
+        roleRatesLoadState = .loading
+        do {
+            let accessToken = try await authentication.validAccessToken()
+            let client = PlatformAPIClient(baseURL: baseURL)
+            roleRates = try await client.fetchRoleRates(accessToken: accessToken)
+            roleRatesLoadState = .loaded
+        } catch AuthenticationFailure.providerUnavailable {
+            roleRatesLoadState = .offline
+        } catch is AuthenticationFailure {
+            roleRatesLoadState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
+        } catch PlatformAPIError.unauthorized {
+            roleRatesLoadState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
+        } catch {
+            roleRatesLoadState = .error("No fue posible cargar las tarifas. Inténtalo nuevamente.")
+        }
+    }
+
+    func saveRoleRate(
+        role: OrganizationRole,
+        hourlyRateMXN: Int,
+        using authentication: AuthenticationController
+    ) async {
+        guard let organizationId = currentOrganizationID else {
+            roleRateSaveState = .error("Todavía no se pudo determinar tu organización.")
+            return
+        }
+        guard let issuer = authentication.configuration?.issuer,
+              let baseURL = URL.platformGatewayBaseURL(fromIssuer: issuer)
+        else {
+            roleRateSaveState = .error("No hay una sesión configurada para guardar la tarifa.")
+            return
+        }
+
+        roleRateSaveState = .saving
+        do {
+            let accessToken = try await authentication.validAccessToken()
+            let client = PlatformAPIClient(baseURL: baseURL)
+            let saved = try await client.upsertRoleRate(
+                UpsertRoleRateCommand(
+                    organizationId: organizationId,
+                    role: role,
+                    hourlyRateMXN: hourlyRateMXN
+                ),
+                accessToken: accessToken
+            )
+            roleRates.removeAll { $0.role == saved.role && $0.organizationId == saved.organizationId }
+            roleRates.append(saved)
+            roleRateSaveState = .idle
+        } catch AuthenticationFailure.providerUnavailable {
+            roleRateSaveState = .error("Sin conexión; la tarifa no se guardó.")
+        } catch is AuthenticationFailure {
+            roleRateSaveState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
+        } catch PlatformAPIError.unauthorized {
+            roleRateSaveState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
+        } catch PlatformAPIError.forbidden {
+            roleRateSaveState = .error("Sólo un administrador de la organización puede capturar tarifas internas.")
+        } catch {
+            roleRateSaveState = .error("No fue posible guardar la tarifa. Inténtalo nuevamente.")
         }
     }
 

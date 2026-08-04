@@ -10,6 +10,10 @@ import {
   createPostgresProjectRepository,
   type ProjectRepository,
 } from "./projects.js";
+import {
+  createPostgresRoleRateRepository,
+  type RoleRateRepository,
+} from "./role-rates.js";
 
 export type DatabaseConnection = {
   probe: () => Promise<DependencyStatus[]>;
@@ -17,6 +21,7 @@ export type DatabaseConnection = {
   projects: ProjectRepository;
   graph: GraphRepository;
   members: MemberRepository;
+  roleRates: RoleRateRepository;
 };
 
 export function createDatabaseConnection(
@@ -46,6 +51,10 @@ export function createDatabaseConnection(
       },
       members: {
         list: unavailable,
+      },
+      roleRates: {
+        list: unavailable,
+        upsert: unavailable,
       },
     };
   }
@@ -79,6 +88,7 @@ export function createDatabaseConnection(
     projects: createPostgresProjectRepository(pool),
     graph: createPostgresGraphRepository(pool),
     members: createPostgresMemberRepository(pool),
+    roleRates: createPostgresRoleRateRepository(pool),
   };
 }
 
