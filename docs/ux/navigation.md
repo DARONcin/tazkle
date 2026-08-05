@@ -108,24 +108,24 @@ Sidebar de navegación | Contenido principal | Inspector contextual
 
 ## Equipo, factibilidad, costos y plan de trabajo
 
-- Mientras estos dominios no estén conectados a Project Core, cada pantalla se
-  identifica como `Escenario de prototipo`. Sus personas, horas, resultados y
-  cifras son datos ficticios y no se presentan como estado persistido del
-  proyecto.
-- Equipo separa vista general, cobertura, capacidad, asignaciones y roles
-  pendientes. La sobrecarga combina porcentaje, texto e icono; nunca depende
-  únicamente del color.
-- Factibilidad presenta primero conclusión, confianza y condiciones. Las diez
-  dimensiones, evidencias, supuestos, alternativas y aprobación permanecen en
-  subvistas independientes.
-- Costos separa explícitamente costo interno, precio propuesto, margen y reserva.
-  El prototipo declara que la autorización por tarifas aún no está implementada;
-  mostrar un icono de candado no se considera un control de acceso.
-- Plan de trabajo no mezcla calendario, tablero y backlog en la misma superficie.
-  El tablero permite mover tareas mediante arrastre o mediante el menú de estado
-  de cada tarjeta.
-- Acciones de asignación, revisión, excepción y cierre sólo modifican estado
-  efímero del escenario. No simulan envíos externos ni aprobaciones persistidas.
+- Equipo ya lista miembros reales desde Project Core (persona, rol, estado de
+  acceso); cobertura, capacidad y asignaciones siguen sin dominio real detrás,
+  así que muestran un estado "sin datos conectados" en vez de cifras
+  inventadas.
+- Factibilidad presenta primero conclusión, confianza y condiciones — esa
+  parte y las diez dimensiones son cálculo local real desde el grafo y el
+  perfil de planeación guardados. Evidencias, supuestos, alternativas y
+  aprobación todavía no tienen dominio real: cada subvista lo declara en vez
+  de simular fuentes, condiciones o una persona responsable.
+- Costos separa explícitamente costo interno, precio propuesto, margen y
+  reserva; el resumen, el desglose por rol y la propuesta son cálculo local
+  real. Costo por módulo, servicios/licencias e historial del presupuesto
+  todavía no tienen dominio real y muestran el mismo estado "sin datos
+  conectados".
+- Plan de trabajo no tiene todavía un dominio de tareas, sprints ni tablero en
+  Project Core: cada subvista (resumen, calendario, tablero, backlog,
+  entregables, aprobaciones) declara explícitamente que está pendiente en vez
+  de simular un sprint, fechas o responsables.
 
 ## Cuenta y organización
 
@@ -141,14 +141,12 @@ Sidebar de navegación | Contenido principal | Inspector contextual
   Mientras el resto de los apartados no esté conectado, se identifican como
   escenarios de prototipo y sus acciones no simulan invitaciones, sesiones,
   cambios remotos ni sincronización.
-- Los costos internos permanecen separados del precio al cliente. La matriz de
-  permisos documenta la intención, pero no concede autoridad desde el cliente.
-- IA muestra proveedor, minimización de contexto y límites antes de cualquier
-  configuración de credenciales. La aplicación nunca solicita ni conserva claves
-  de proveedores.
-- Sincronización distingue el SQLite local de Neon y PowerSync, que aún son
-  arquitectura prevista. Seguridad separa controles diseñados de controles
-  realmente conectados.
+- Los costos internos permanecen separados del precio al cliente. Organización,
+  Disponibilidad, Permisos, Plantillas, IA y Sincronización todavía no tienen
+  dominio real detrás; cada una declara "sin datos conectados" en vez de
+  simular una matriz de permisos, un proveedor de IA o un estado de
+  sincronización. Seguridad separa controles diseñados de controles realmente
+  conectados.
 - Los formularios conservan etiquetas visibles, estados expresados con texto e
   icono, y una composición adaptable de dos columnas a una columna.
 

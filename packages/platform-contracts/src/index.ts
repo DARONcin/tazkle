@@ -378,6 +378,45 @@ export const upsertRoleRateResponseSchema = z
 
 export type UpsertRoleRateResponse = z.infer<typeof upsertRoleRateResponseSchema>;
 
+export const organizationPlanningDefaultsSchema = z
+  .object({
+    organizationId: z.string().uuid(),
+    riskReservePercent: z.number().int().min(0).max(100),
+    targetMarginPercent: z.number().int().min(0).max(100),
+    workdayHours: z.number().int().min(1).max(24),
+    allowFinanceRateEdits: z.boolean(),
+    updatedAt: z.string().datetime({ offset: true }),
+  })
+  .strict();
+
+export type OrganizationPlanningDefaults = z.infer<
+  typeof organizationPlanningDefaultsSchema
+>;
+
+export const updateOrganizationPlanningDefaultsCommandSchema = z
+  .object({
+    riskReservePercent: z.number().int().min(0).max(100),
+    targetMarginPercent: z.number().int().min(0).max(100),
+    workdayHours: z.number().int().min(1).max(24),
+    allowFinanceRateEdits: z.boolean(),
+  })
+  .strict();
+
+export type UpdateOrganizationPlanningDefaultsCommand = z.infer<
+  typeof updateOrganizationPlanningDefaultsCommandSchema
+>;
+
+export const updateOrganizationPlanningDefaultsResponseSchema = z
+  .object({
+    defaults: organizationPlanningDefaultsSchema,
+    replayed: z.boolean(),
+  })
+  .strict();
+
+export type UpdateOrganizationPlanningDefaultsResponse = z.infer<
+  typeof updateOrganizationPlanningDefaultsResponseSchema
+>;
+
 export const externalActorSchema = z
   .object({
     issuer: z.string().url().max(512),

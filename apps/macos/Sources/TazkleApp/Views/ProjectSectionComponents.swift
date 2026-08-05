@@ -284,6 +284,37 @@ struct ProjectProgressRow: View {
     }
 }
 
+/// Honest placeholder for a section with no real domain behind it yet — no
+/// fabricated numbers, no simulated actions. Used instead of prototype data
+/// once a subview has nothing real to show. Mirrors the pattern already
+/// proven for Miembros y roles and Costos y tarifas before those went real.
+struct SectionUnavailableView: View {
+    let title: String
+    let detail: String
+    var systemImage = "externaldrive.badge.questionmark"
+
+    var body: some View {
+        ProjectSectionCard(title: title, systemImage: systemImage) {
+            Label(
+                "Sin datos conectados",
+                systemImage: "externaldrive.badge.questionmark"
+            )
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(TazkleColors.relationship)
+
+            Text(detail)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("Los datos de ejemplo se retiraron para que el prototipo no parezca contener información real.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: 760)
+    }
+}
+
 struct ProjectListRow<Leading: View, Trailing: View>: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.tazkleHighContrast) private var highContrast

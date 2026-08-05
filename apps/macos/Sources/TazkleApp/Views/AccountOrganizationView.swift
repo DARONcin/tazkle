@@ -25,7 +25,8 @@ struct AccountOrganizationView: View {
 
                 switch destinationID {
                 case "settings.availability", "settings.organization",
-                     "settings.members", "settings.permissions":
+                     "settings.members", "settings.permissions",
+                     "settings.templates", "settings.ai", "settings.sync":
                     ConnectedAccountDomainUnavailableView(
                         destinationID: destinationID
                     )
@@ -37,12 +38,6 @@ struct AccountOrganizationView: View {
                     AppearanceSettingsView()
                 case "settings.shortcuts":
                     KeyboardSettingsView()
-                case "settings.templates":
-                    TemplateSettingsView()
-                case "settings.ai":
-                    AISettingsView()
-                case "settings.sync":
-                    SyncSettingsView()
                 case "settings.security":
                     SecuritySettingsView()
                 default:
@@ -395,24 +390,7 @@ private struct ConnectedAccountDomainUnavailableView: View {
     let destinationID: String
 
     var body: some View {
-        ProjectSectionCard(title: title, systemImage: systemImage) {
-            Label(
-                "Sin datos conectados",
-                systemImage: "externaldrive.badge.questionmark"
-            )
-            .font(.callout.weight(.semibold))
-            .foregroundStyle(TazkleColors.relationship)
-
-            Text(detail)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Text("Los datos de ejemplo se retiraron para que el prototipo no parezca contener información real.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: 760)
+        SectionUnavailableView(title: title, detail: detail, systemImage: systemImage)
     }
 
     private var title: String {
@@ -420,6 +398,9 @@ private struct ConnectedAccountDomainUnavailableView: View {
         case "settings.availability": "Disponibilidad pendiente"
         case "settings.members": "Directorio pendiente"
         case "settings.permissions": "Permisos pendientes"
+        case "settings.templates": "Plantillas pendientes"
+        case "settings.ai": "IA pendiente"
+        case "settings.sync": "Sincronización pendiente"
         default: "Organización pendiente"
         }
     }
@@ -429,6 +410,9 @@ private struct ConnectedAccountDomainUnavailableView: View {
         case "settings.availability": "calendar.badge.clock"
         case "settings.members": "person.2.slash"
         case "settings.permissions": "lock.badge.clock"
+        case "settings.templates": "doc.on.doc"
+        case "settings.ai": "sparkles"
+        case "settings.sync": "arrow.triangle.2.circlepath"
         default: "building.2"
         }
     }
@@ -441,88 +425,14 @@ private struct ConnectedAccountDomainUnavailableView: View {
             "Los miembros se obtendrán de Project Core; no se mostrarán personas de demostración."
         case "settings.permissions":
             "Los permisos efectivos dependerán de roles reales y de autorización del servidor."
+        case "settings.templates":
+            "Las plantillas reutilizables de proyecto todavía no existen como dominio real en Project Core."
+        case "settings.ai":
+            "Tazki todavía no tiene un proveedor de IA conectado; no se solicitan ni conservan claves hasta entonces."
+        case "settings.sync":
+            "Neon y PowerSync son arquitectura prevista; no hay sincronización remota activa todavía."
         default:
             "Crea o conecta una organización para definir propiedad, responsables y políticas."
-        }
-    }
-}
-
-private struct AvailabilitySettingsView: View {
-    @State private var weeklyCapacity = 40.0
-    @State private var workingDays = Set(["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"])
-    @State private var focusTime = true
-
-    private let days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: TazkleSpacing.xLarge) {
-            LazyVGrid(columns: ProjectGridLayout.equalColumns(3), spacing: TazkleSpacing.medium) {
-                ProjectMetricCard(title: "Capacidad semanal", value: "\(Int(weeklyCapacity)) h", detail: "Disponible entre proyectos", systemImage: "clock", accent: TazkleColors.actionPrimary)
-                ProjectMetricCard(title: "Compromiso actual", value: "32 h", detail: "80% de la capacidad", systemImage: "chart.bar.fill", accent: TazkleColors.success)
-                ProjectMetricCard(title: "Capacidad libre", value: "\(max(0, Int(weeklyCapacity) - 32)) h", detail: "Antes de una nueva asignación", systemImage: "plus.circle", accent: TazkleColors.relationship)
-            }
-
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: TazkleSpacing.medium) {
-                    ProjectSectionCard(title: "Semana laboral", systemImage: "calendar") {
-                        Stepper("Capacidad: \(Int(weeklyCapacity)) horas", value: $weeklyCapacity, in: 8...60, step: 4)
-                        ForEach(days, id: \.self) { day in
-                            Toggle(
-                                day,
-                                isOn: Binding(
-                                    get: { workingDays.contains(day) },
-                                    set: { enabled in
-                                        if enabled {
-                                            workingDays.insert(day)
-                                        } else {
-                                            workingDays.remove(day)
-                                        }
-                                    }
-                                )
-                            )
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .top)
-
-                    ProjectSectionCard(title: "Reglas de asignación", systemImage: "person.badge.clock") {
-                        Toggle("Reservar bloques de concentración", isOn: $focusTime)
-                        Toggle("Advertir antes de superar 90%", isOn: .constant(true))
-                            .disabled(true)
-                        SettingsValueRow(title: "Proyecto web", detail: "Compromiso principal", value: "20 h", systemImage: "macwindow")
-                        SettingsValueRow(title: "Portal interno", detail: "Soporte compartido", value: "12 h", systemImage: "briefcase")
-                    }
-                    .frame(maxWidth: .infinity, alignment: .top)
-                }
-                VStack(spacing: TazkleSpacing.medium) {
-                    Text("Edita la capacidad y los días laborables en esta pantalla.")
-                    ProjectSectionCard(title: "Semana laboral", systemImage: "calendar") {
-                        Stepper("Capacidad: \(Int(weeklyCapacity)) horas", value: $weeklyCapacity, in: 8...60, step: 4)
-                        ForEach(days, id: \.self) { day in
-                            Toggle(day, isOn: Binding(
-                                get: { workingDays.contains(day) },
-                                set: { enabled in
-                                    if enabled {
-                                        workingDays.insert(day)
-                                    } else {
-                                        workingDays.remove(day)
-                                    }
-                                }
-                            ))
-                        }
-                    }
-                    ProjectSectionCard(title: "Reglas de asignación", systemImage: "person.badge.clock") {
-                        Toggle("Reservar bloques de concentración", isOn: $focusTime)
-                        SettingsValueRow(title: "Compromiso actual", detail: "Dos proyectos", value: "32 h", systemImage: "briefcase")
-                    }
-                }
-            }
-
-            AccountNotice(
-                title: "No se aplicará una sobreasignación en silencio",
-                detail: "Cuando exista sincronización, una asignación que exceda la capacidad requerirá corrección o una excepción documentada.",
-                systemImage: "exclamationmark.triangle.fill",
-                color: TazkleColors.warning
-            )
         }
     }
 }
@@ -684,338 +594,6 @@ private struct KeyboardSettingsView: View {
     }
 }
 
-private struct OrganizationSettingsView: View {
-    @State private var name = "Tazkle Studio"
-    @State private var identifier = "tazkle-studio"
-    @State private var description = "Equipo de producto y tecnología"
-    @State private var currency = "MXN — Peso mexicano"
-    @State private var timeZone = "GMT−6 Chihuahua"
-    @State private var baseTemplate = "Aplicación web"
-    @State private var mandatoryPhases = true
-    @State private var feasibilityApproval = true
-    @State private var saved = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: TazkleSpacing.xLarge) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: TazkleSpacing.medium) {
-                    organizationCard
-                    statusCard
-                }
-                VStack(spacing: TazkleSpacing.medium) {
-                    organizationCard
-                    statusCard
-                }
-            }
-
-            ProjectSectionCard(title: "Valores predeterminados", systemImage: "slider.horizontal.3") {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: TazkleSpacing.large) {
-                        Picker("Moneda", selection: $currency) {
-                            Text("MXN — Peso mexicano").tag("MXN — Peso mexicano")
-                            Text("USD — Dólar estadounidense").tag("USD — Dólar estadounidense")
-                        }
-                        Picker("Zona horaria", selection: $timeZone) {
-                            Text("GMT−6 Chihuahua").tag("GMT−6 Chihuahua")
-                            Text("GMT−6 Ciudad de México").tag("GMT−6 Ciudad de México")
-                        }
-                        Picker("Plantilla base", selection: $baseTemplate) {
-                            Text("Aplicación web").tag("Aplicación web")
-                        }
-                    }
-                    VStack(alignment: .leading, spacing: TazkleSpacing.medium) {
-                        Picker("Moneda", selection: $currency) {
-                            Text("MXN — Peso mexicano").tag("MXN — Peso mexicano")
-                        }
-                        Picker("Zona horaria", selection: $timeZone) {
-                            Text("GMT−6 Chihuahua").tag("GMT−6 Chihuahua")
-                        }
-                        Picker("Plantilla base", selection: $baseTemplate) {
-                            Text("Aplicación web").tag("Aplicación web")
-                        }
-                    }
-                }
-                Toggle("Crear fases obligatorias de la plantilla", isOn: $mandatoryPhases)
-                Toggle("Solicitar aprobación de factibilidad", isOn: $feasibilityApproval)
-            }
-
-            HStack {
-                if saved {
-                    Label("Cambios preparados; no se enviaron a un servidor", systemImage: "internaldrive")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(TazkleColors.success)
-                }
-                Spacer()
-                Button("Guardar borrador") { saved = true }
-                    .buttonStyle(.borderedProminent)
-                    .tint(TazkleColors.relationship)
-            }
-        }
-    }
-
-    private var organizationCard: some View {
-        ProjectSectionCard(title: "Identidad del espacio", systemImage: "building.2") {
-            HStack(spacing: TazkleSpacing.large) {
-                ZStack {
-                    Circle().fill(TazkleColors.relationship.opacity(0.2))
-                    Text("TS")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(TazkleColors.relationship)
-                }
-                .frame(width: 68, height: 68)
-                VStack(alignment: .leading) {
-                    TextField("Nombre del espacio", text: $name)
-                        .accountFieldSurface()
-                    TextField("Identificador", text: $identifier)
-                        .accountFieldSurface()
-                }
-            }
-            TextField("Descripción", text: $description)
-                .accountFieldSurface()
-            SettingsValueRow(
-                title: "Propiedad",
-                detail: "Un único propietario; organizaciones externas colaboran por invitación",
-                value: "Tazkle Studio",
-                systemImage: "building.2.crop.circle"
-            )
-            SettingsValueRow(
-                title: "Responsable final",
-                detail: "Resuelve aprobaciones cuando la política lo permite",
-                value: "Sin datos conectados",
-                systemImage: "person.badge.key"
-            )
-        }
-        .frame(maxWidth: .infinity, alignment: .top)
-    }
-
-    private var statusCard: some View {
-        ProjectSectionCard(title: "Estado y administración", systemImage: "checkmark.shield") {
-            SettingsValueRow(title: "Plan", detail: "Escenario conceptual", value: "Equipo", systemImage: "crown")
-            SettingsValueRow(title: "Miembros", detail: "Incluye una invitación", value: "6", systemImage: "person.3")
-            SettingsValueRow(title: "Proyectos activos", detail: "Un propietario por proyecto", value: "3", systemImage: "folder")
-            SettingsValueRow(title: "Responsable", detail: "Puede transferirse con aprobación", value: "Sin datos conectados", systemImage: "person.badge.key")
-        }
-        .frame(maxWidth: 420, alignment: .top)
-    }
-}
-
-private struct MembersSettingsView: View {
-    @EnvironmentObject private var appState: AppState
-    @EnvironmentObject private var authentication: AuthenticationController
-    @State private var search = ""
-
-    private var members: [OrganizationMember] {
-        guard !search.isEmpty else { return appState.teamMembers }
-        return appState.teamMembers.filter {
-            ($0.displayName ?? "").localizedCaseInsensitiveContains(search)
-                || $0.role.displayName.localizedCaseInsensitiveContains(search)
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: TazkleSpacing.xLarge) {
-            switch appState.teamLoadState {
-            case .idle, .loading:
-                AccountNotice(
-                    title: "Cargando miembros",
-                    detail: "Consultando la organización real desde Project Core.",
-                    systemImage: "arrow.triangle.2.circlepath",
-                    color: TazkleColors.relationship
-                )
-            case .offline:
-                AccountNotice(
-                    title: "Sin conexión",
-                    detail: "El directorio se actualizará automáticamente al recuperar conexión.",
-                    systemImage: "wifi.slash",
-                    color: TazkleColors.warning
-                )
-            case let .error(message):
-                AccountNotice(
-                    title: "No fue posible cargar el directorio",
-                    detail: message,
-                    systemImage: "exclamationmark.triangle.fill",
-                    color: TazkleColors.warning
-                )
-            case .loaded:
-                ProjectMetricCard(
-                    title: "Miembros",
-                    value: "\(appState.teamMembers.count)",
-                    detail: "Acceso activo en tu organización",
-                    systemImage: "person.3.fill",
-                    accent: TazkleColors.relationship
-                )
-                .frame(maxWidth: 320)
-            }
-
-            ProjectSectionCard(title: "Directorio", systemImage: "person.3") {
-                TextField("Buscar persona o rol", text: $search)
-                    .accountFieldSurface()
-
-                Label(
-                    "Invitar personas todavía no está conectado a Project Core.",
-                    systemImage: "envelope.badge.shield.half.filled"
-                )
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-                if appState.teamLoadState == .loaded, members.isEmpty {
-                    Text(
-                        search.isEmpty
-                            ? "Todavía no hay miembros en tu organización."
-                            : "Ninguna persona coincide con “\(search)”."
-                    )
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                }
-
-                ForEach(members) { member in
-                    ProjectListRow {
-                        HStack(spacing: TazkleSpacing.medium) {
-                            ZStack {
-                                Circle().fill(TazkleColors.relationship.opacity(0.18))
-                                Text(initials(for: member))
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(TazkleColors.relationship)
-                            }
-                            .frame(width: 34, height: 34)
-                            Text(member.displayName ?? "Sin nombre")
-                                .font(.callout.weight(.semibold))
-                        }
-                    } trailing: {
-                        HStack(spacing: TazkleSpacing.medium) {
-                            Text(member.role.displayName)
-                                .font(.callout)
-                            ProjectStatusPill(
-                                title: member.status.displayName,
-                                systemImage: member.status == .active ? "checkmark.circle.fill" : "clock.fill",
-                                color: member.status == .active ? TazkleColors.success : TazkleColors.warning
-                            )
-                        }
-                    }
-                }
-            }
-        }
-        .task {
-            guard appState.teamLoadState == .idle else { return }
-            await appState.loadTeamMembers(using: authentication)
-        }
-    }
-
-    private func initials(for member: OrganizationMember) -> String {
-        let name = member.displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let name, !name.isEmpty else { return "?" }
-        let letters = name.split(separator: " ").prefix(2).compactMap { $0.first }
-        return String(letters).uppercased()
-    }
-}
-
-private struct PermissionsSettingsView: View {
-    @State private var selectedRole = "Responsable del proyecto"
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: TazkleSpacing.xLarge) {
-            AccountNotice(
-                title: "La vista no concede autoridad",
-                detail: "Esta matriz documenta la intención del producto. Project Core deberá resolver organización, proyecto, objeto, acción y propiedades en cada petición.",
-                systemImage: "lock.shield.fill",
-                color: TazkleColors.relationship
-            )
-
-            ProjectSectionCard(title: "Matriz por responsabilidad", systemImage: "rectangle.grid.3x2") {
-                Picker("Rol", selection: $selectedRole) {
-                    ForEach(AccountPrototype.permissionRows.map(\.role), id: \.self) { role in
-                        Text(role).tag(role)
-                    }
-                }
-                .frame(maxWidth: 360)
-
-                if let row = AccountPrototype.permissionRows.first(where: { $0.role == selectedRole }) {
-                    ForEach(row.permissions) { permission in
-                        ProjectListRow {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(permission.area)
-                                    .font(.callout.weight(.medium))
-                                Text(permission.detail)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        } trailing: {
-                            ProjectStatusPill(
-                                title: permission.level,
-                                systemImage: permission.systemImage,
-                                color: permission.color
-                            )
-                        }
-                    }
-                }
-            }
-
-            ProjectSectionCard(title: "Separación de información sensible", systemImage: "eye.slash") {
-                SettingsValueRow(title: "Costos internos", detail: "Dirección, finanzas y responsables autorizados", value: "Restringido", systemImage: "banknote", valueColor: TazkleColors.warning)
-                SettingsValueRow(title: "Precio al cliente", detail: "Puede compartirse sin exponer tarifas internas", value: "Separado", systemImage: "tag", valueColor: TazkleColors.success)
-                SettingsValueRow(title: "Roles del cliente", detail: "Son indicativos hasta validación del servidor", value: "Sin autoridad", systemImage: "person.text.rectangle", valueColor: TazkleColors.warning)
-            }
-        }
-    }
-}
-
-private struct TemplateSettingsView: View {
-    @State private var selectedTemplate = "Aplicación web"
-    @State private var mandatoryPhases = true
-    @State private var strictContradictions = true
-    @State private var warningRelations = true
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: TazkleSpacing.xLarge) {
-            ProjectSectionCard(title: "Plantilla inicial", systemImage: "doc.on.doc") {
-                Picker("Plantilla", selection: $selectedTemplate) {
-                    Text("Aplicación web").tag("Aplicación web")
-                }
-                .pickerStyle(.segmented)
-
-                HStack(alignment: .top, spacing: TazkleSpacing.medium) {
-                    Image(systemName: "macwindow")
-                        .font(.largeTitle)
-                        .foregroundStyle(TazkleColors.actionPrimary)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Aplicación web")
-                            .font(.title3.weight(.semibold))
-                        Text("Idea, factibilidad, preproducción, diseño, desarrollo, pruebas, producción y seguimiento.")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: TazkleSpacing.medium) {
-                    ProjectSectionCard(title: "Reglas de estructura", systemImage: "point.3.connected.trianglepath.dotted") {
-                        Toggle("Conservar fases obligatorias", isOn: $mandatoryPhases)
-                        Toggle("Bloquear contradicciones graves", isOn: $strictContradictions)
-                        Toggle("Advertir relaciones discutibles", isOn: $warningRelations)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .top)
-
-                    ProjectSectionCard(title: "Catálogo inicial", systemImage: "square.grid.2x2") {
-                        SettingsValueRow(title: "Familias de bloques", detail: "Estrategia, producto, proceso, tecnología, personas, economía y gobierno", value: "7", systemImage: "square.stack.3d.up")
-                        SettingsValueRow(title: "Tipos personalizados", detail: "Fuera de la primera versión", value: "No disponible", systemImage: "hammer", valueColor: TazkleColors.warning)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .top)
-                }
-                VStack(spacing: TazkleSpacing.medium) {
-                    ProjectSectionCard(title: "Reglas de estructura", systemImage: "point.3.connected.trianglepath.dotted") {
-                        Toggle("Conservar fases obligatorias", isOn: $mandatoryPhases)
-                        Toggle("Bloquear contradicciones graves", isOn: $strictContradictions)
-                        Toggle("Advertir relaciones discutibles", isOn: $warningRelations)
-                    }
-                    ProjectSectionCard(title: "Catálogo inicial", systemImage: "square.grid.2x2") {
-                        SettingsValueRow(title: "Familias de bloques", detail: "Catálogo de la plantilla web", value: "7", systemImage: "square.stack.3d.up")
-                    }
-                }
-            }
-        }
-    }
-}
 
 private struct RoleRatesSettingsView: View {
     @EnvironmentObject private var appState: AppState
@@ -1057,7 +635,7 @@ private struct RoleRatesSettingsView: View {
             }
 
             ProjectSectionCard(title: "Tarifas por rol", systemImage: "person.2") {
-                Text("Tarifa interna en MXN por hora, capturada a mano por un administrador. No es visible para el cliente.")
+                Text("Tarifa interna en MXN por hora, capturada a mano por un administrador (o Finanzas, si está habilitado abajo). No es visible para el cliente.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -1078,11 +656,160 @@ private struct RoleRatesSettingsView: View {
                         .accessibilityElement(children: .combine)
                 }
             }
+
+            OrganizationPlanningDefaultsCard()
+        }
+        .task {
+            guard appState.teamLoadState == .idle else { return }
+            await appState.loadTeamMembers(using: authentication)
         }
         .task {
             guard appState.roleRatesLoadState == .idle else { return }
             await appState.loadRoleRates(using: authentication)
         }
+    }
+}
+
+private struct OrganizationPlanningDefaultsCard: View {
+    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var authentication: AuthenticationController
+
+    @State private var reserveDraft = ""
+    @State private var marginDraft = ""
+    @State private var workdayDraft = ""
+    @State private var allowFinanceRateEditsDraft = false
+    @FocusState private var focusedField: Field?
+
+    private enum Field {
+        case reserve, margin, workday
+    }
+
+    var body: some View {
+        ProjectSectionCard(title: "Valores predeterminados", systemImage: "slider.horizontal.3") {
+            Text("Reserva de riesgo, margen objetivo y jornada usados por defecto al cotizar. Moneda fija en MXN.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            switch appState.organizationPlanningDefaultsLoadState {
+            case .idle:
+                EmptyView()
+            case .loading:
+                Label("Cargando valores predeterminados…", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            case .offline:
+                Label("Sin conexión; se actualizarán al recuperar conexión.", systemImage: "wifi.slash")
+                    .font(.callout)
+                    .foregroundStyle(TazkleColors.warning)
+            case let .error(message):
+                Label(message, systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout)
+                    .foregroundStyle(TazkleColors.warning)
+            case .loaded:
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: TazkleSpacing.large) {
+                        field("Reserva de riesgo", suffix: "%", text: $reserveDraft, focus: .reserve)
+                        field("Margen objetivo", suffix: "%", text: $marginDraft, focus: .margin)
+                        field("Jornada", suffix: "h", text: $workdayDraft, focus: .workday)
+                        SettingsValueRow(title: "Moneda", detail: "Fija por ahora", value: "MXN", systemImage: "pesosign.circle")
+                            .frame(maxWidth: 220)
+                    }
+                    VStack(alignment: .leading, spacing: TazkleSpacing.medium) {
+                        field("Reserva de riesgo", suffix: "%", text: $reserveDraft, focus: .reserve)
+                        field("Margen objetivo", suffix: "%", text: $marginDraft, focus: .margin)
+                        field("Jornada", suffix: "h", text: $workdayDraft, focus: .workday)
+                        SettingsValueRow(title: "Moneda", detail: "Fija por ahora", value: "MXN", systemImage: "pesosign.circle")
+                    }
+                }
+
+                Divider()
+
+                Toggle("Permitir edición a Finanzas", isOn: $allowFinanceRateEditsDraft)
+                Text("Cuando está activo, además de Administrador de organización, cualquier persona con rol Finanzas puede capturar tarifas y estos valores predeterminados.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack {
+                    if case let .error(message) = appState.organizationPlanningDefaultsSaveState {
+                        Label(message, systemImage: "exclamationmark.circle")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(TazkleColors.warning)
+                    }
+                    Spacer()
+                    Button("Guardar valores predeterminados") { Task { await save() } }
+                        .buttonStyle(.borderedProminent)
+                        .tint(TazkleColors.relationship)
+                        .disabled(
+                            appState.organizationPlanningDefaultsSaveState == .saving
+                                || !hasChange
+                        )
+                }
+            }
+        }
+        .onAppear { syncDrafts() }
+        .onChange(of: appState.organizationPlanningDefaults) { _, _ in
+            if focusedField == nil { syncDrafts() }
+        }
+        .task(id: appState.currentOrganizationID) {
+            guard appState.organizationPlanningDefaultsLoadState == .idle,
+                  appState.currentOrganizationID != nil
+            else { return }
+            await appState.loadOrganizationPlanningDefaults(using: authentication)
+        }
+    }
+
+    private func field(_ title: String, suffix: String, text: Binding<String>, focus: Field) -> some View {
+        VStack(alignment: .leading, spacing: TazkleSpacing.xSmall) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack(spacing: TazkleSpacing.xSmall) {
+                TextField("", text: text)
+                    .accountFieldSurface()
+                    .frame(width: 64)
+                    .multilineTextAlignment(.trailing)
+                    .focused($focusedField, equals: focus)
+                    .accessibilityLabel(title)
+                Text(suffix)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var hasChange: Bool {
+        guard let defaults = appState.organizationPlanningDefaults,
+              let reserve = Int(reserveDraft),
+              let margin = Int(marginDraft),
+              let workday = Int(workdayDraft)
+        else { return false }
+        return reserve != defaults.riskReservePercent
+            || margin != defaults.targetMarginPercent
+            || workday != defaults.workdayHours
+            || allowFinanceRateEditsDraft != defaults.allowFinanceRateEdits
+    }
+
+    private func syncDrafts() {
+        guard let defaults = appState.organizationPlanningDefaults else { return }
+        reserveDraft = String(defaults.riskReservePercent)
+        marginDraft = String(defaults.targetMarginPercent)
+        workdayDraft = String(defaults.workdayHours)
+        allowFinanceRateEditsDraft = defaults.allowFinanceRateEdits
+    }
+
+    private func save() async {
+        guard let reserve = Int(reserveDraft), (0...100).contains(reserve),
+              let margin = Int(marginDraft), (0...100).contains(margin),
+              let workday = Int(workdayDraft), (1...24).contains(workday)
+        else { return }
+        await appState.saveOrganizationPlanningDefaults(
+            riskReservePercent: reserve,
+            targetMarginPercent: margin,
+            workdayHours: workday,
+            allowFinanceRateEdits: allowFinanceRateEditsDraft,
+            using: authentication
+        )
     }
 }
 
@@ -1143,125 +870,6 @@ private struct RoleRateRow: View {
     }
 }
 
-private struct AISettingsView: View {
-    @State private var provider = "Sin proveedor conectado"
-    @State private var privacyMode = "Contexto mínimo"
-    @State private var humanApproval = true
-    @State private var redactCosts = true
-    @State private var allowExternalLinks = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: TazkleSpacing.xLarge) {
-            AccountNotice(
-                title: "Tazki no tiene autoridad directa",
-                detail: "Las propuestas de alcance, arquitectura, costo o acciones externas requieren esquema estricto, validación determinista y revisión humana.",
-                systemImage: "sparkles.rectangle.stack",
-                color: TazkleColors.assistantProposal
-            )
-
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: TazkleSpacing.medium) {
-                    ProjectSectionCard(title: "Proveedor", systemImage: "network") {
-                        Picker("Ruta de IA", selection: $provider) {
-                            Text("Sin proveedor conectado").tag("Sin proveedor conectado")
-                            Text("OmniRoute — candidato por evaluar").tag("OmniRoute — candidato por evaluar")
-                            Text("Proveedor propio — futuro").tag("Proveedor propio — futuro")
-                        }
-                        Text("Las claves vivirán en el almacén de secretos del servicio, nunca en la aplicación macOS.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .top)
-
-                    ProjectSectionCard(title: "Privacidad", systemImage: "hand.raised") {
-                        Picker("Contexto enviado", selection: $privacyMode) {
-                            Text("Contexto mínimo").tag("Contexto mínimo")
-                            Text("Proyecto completo con aprobación").tag("Proyecto completo con aprobación")
-                        }
-                        Toggle("Redactar costos y datos personales", isOn: $redactCosts)
-                        Toggle("Permitir enlaces externos", isOn: $allowExternalLinks)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .top)
-                }
-                VStack(spacing: TazkleSpacing.medium) {
-                    ProjectSectionCard(title: "Proveedor", systemImage: "network") {
-                        Picker("Ruta de IA", selection: $provider) {
-                            Text("Sin proveedor conectado").tag("Sin proveedor conectado")
-                            Text("OmniRoute — candidato por evaluar").tag("OmniRoute — candidato por evaluar")
-                        }
-                    }
-                    ProjectSectionCard(title: "Privacidad", systemImage: "hand.raised") {
-                        Picker("Contexto enviado", selection: $privacyMode) {
-                            Text("Contexto mínimo").tag("Contexto mínimo")
-                        }
-                        Toggle("Redactar datos sensibles", isOn: $redactCosts)
-                    }
-                }
-            }
-
-            ProjectSectionCard(title: "Límites de operación", systemImage: "shield.lefthalf.filled") {
-                Toggle("Exigir aprobación humana para cambios materiales", isOn: $humanApproval)
-                    .disabled(true)
-                SettingsValueRow(title: "Acceso a base de datos", detail: "El modelo no escribe directamente", value: "Denegado", systemImage: "cylinder.split.1x2", valueColor: TazkleColors.success)
-                SettingsValueRow(title: "Secretos en prompts", detail: "Regla permanente", value: "Prohibido", systemImage: "key.slash", valueColor: TazkleColors.success)
-                SettingsValueRow(title: "Respuesta del proveedor", detail: "Se trata como entrada no confiable", value: "Validada", systemImage: "checkmark.shield", valueColor: TazkleColors.success)
-            }
-        }
-    }
-}
-
-private struct SyncSettingsView: View {
-    @State private var automaticSync = true
-    @State private var meteredNetworks = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: TazkleSpacing.xLarge) {
-            LazyVGrid(columns: ProjectGridLayout.equalColumns(3), spacing: TazkleSpacing.medium) {
-                ProjectMetricCard(title: "Estado local", value: "Guardado", detail: "SQLite en esta Mac", systemImage: "internaldrive.fill", accent: TazkleColors.success)
-                ProjectMetricCard(title: "Nube", value: "No conectada", detail: "Neon y PowerSync son arquitectura prevista", systemImage: "icloud.slash", accent: TazkleColors.warning)
-                ProjectMetricCard(title: "Conflictos", value: "0", detail: "No existe sesión remota", systemImage: "arrow.triangle.branch", accent: TazkleColors.relationship)
-            }
-
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .top, spacing: TazkleSpacing.medium) {
-                    ProjectSectionCard(title: "Comportamiento", systemImage: "arrow.triangle.2.circlepath") {
-                        Toggle("Sincronizar automáticamente al recuperar conexión", isOn: $automaticSync)
-                        Toggle("Sincronizar en redes de uso medido", isOn: $meteredNetworks)
-                        Text("Estos controles son un prototipo; todavía no inician tráfico de red.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .top)
-
-                    ProjectSectionCard(title: "Estados visibles", systemImage: "list.bullet.rectangle") {
-                        ForEach(AccountPrototype.syncStates, id: \.title) { state in
-                            SettingsValueRow(title: state.title, detail: state.detail, value: state.value, systemImage: state.icon, valueColor: state.color)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .top)
-                }
-                VStack(spacing: TazkleSpacing.medium) {
-                    ProjectSectionCard(title: "Comportamiento", systemImage: "arrow.triangle.2.circlepath") {
-                        Toggle("Sincronizar al recuperar conexión", isOn: $automaticSync)
-                        Text("Prototipo: no inicia tráfico de red.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    ProjectSectionCard(title: "Estado actual", systemImage: "internaldrive") {
-                        SettingsValueRow(title: "Guardado localmente", detail: "SQLite", value: "Disponible", systemImage: "checkmark.circle", valueColor: TazkleColors.success)
-                    }
-                }
-            }
-
-            AccountNotice(
-                title: "Los conflictos materiales requieren una decisión",
-                detail: "Alcance, costos, arquitectura y aprobaciones nunca se fusionarán silenciosamente. PowerSync no sustituirá la autorización de Project Core.",
-                systemImage: "arrow.triangle.branch",
-                color: TazkleColors.relationship
-            )
-        }
-    }
-}
 
 private struct SecuritySettingsView: View {
     @EnvironmentObject private var authentication: AuthenticationController
@@ -1487,28 +1095,6 @@ private enum AccountPrototype {
         let keys: String
     }
 
-    struct Permission: Identifiable {
-        let id = UUID()
-        let area: String
-        let detail: String
-        let level: String
-        let systemImage: String
-        let color: Color
-    }
-
-    struct PermissionRow {
-        let role: String
-        let permissions: [Permission]
-    }
-
-    struct SyncState {
-        let title: String
-        let detail: String
-        let value: String
-        let icon: String
-        let color: Color
-    }
-
     static let shortcuts = [
         Shortcut(action: "Paleta de comandos", context: "Global", keys: "⌘K"),
         Shortcut(action: "Buscar", context: "Listas y documentos", keys: "⌘F"),
@@ -1523,39 +1109,5 @@ private enum AccountPrototype {
         Shortcut(action: "Volver al origen", context: "Lienzo", keys: "⌘0"),
         Shortcut(action: "Ajustar mapa a ventana", context: "Lienzo", keys: "⇧⌘F"),
         Shortcut(action: "Referencia de atajos", context: "Global", keys: "⌘/"),
-    ]
-
-    static let permissionRows = [
-        PermissionRow(role: "Responsable del proyecto", permissions: [
-            Permission(area: "Proyecto y alcance", detail: "Edita propuestas y solicita aprobaciones.", level: "Administrar", systemImage: "checkmark.shield.fill", color: TazkleColors.success),
-            Permission(area: "Arquitectura", detail: "Puede proponer y aprobar según la política.", level: "Administrar", systemImage: "checkmark.shield.fill", color: TazkleColors.success),
-            Permission(area: "Costos internos", detail: "Visible si la organización lo autoriza.", level: "Condicionado", systemImage: "exclamationmark.triangle.fill", color: TazkleColors.warning),
-            Permission(area: "Miembros", detail: "Invita; los cambios de rol se auditan.", level: "Administrar", systemImage: "checkmark.shield.fill", color: TazkleColors.success),
-        ]),
-        PermissionRow(role: "Responsable técnico", permissions: [
-            Permission(area: "Arquitectura", detail: "Edita tecnologías y dependencias.", level: "Editar", systemImage: "pencil.circle.fill", color: TazkleColors.actionPrimary),
-            Permission(area: "Factibilidad técnica", detail: "Emite revisión y evidencia.", level: "Revisar", systemImage: "checkmark.circle.fill", color: TazkleColors.success),
-            Permission(area: "Costos internos", detail: "Solo costo técnico agregado.", level: "Lectura parcial", systemImage: "eye.fill", color: TazkleColors.relationship),
-            Permission(area: "Miembros", detail: "No altera roles de organización.", level: "Sin acceso", systemImage: "lock.fill", color: TazkleColors.warning),
-        ]),
-        PermissionRow(role: "Finanzas", permissions: [
-            Permission(area: "Tarifas internas", detail: "Edita valores autorizados.", level: "Administrar", systemImage: "checkmark.shield.fill", color: TazkleColors.success),
-            Permission(area: "Precio al cliente", detail: "Prepara propuesta comercial.", level: "Administrar", systemImage: "checkmark.shield.fill", color: TazkleColors.success),
-            Permission(area: "Arquitectura", detail: "Consulta impacto económico.", level: "Lectura", systemImage: "eye.fill", color: TazkleColors.relationship),
-            Permission(area: "Miembros", detail: "Consulta rol y capacidad, no salarios.", level: "Lectura parcial", systemImage: "eye.fill", color: TazkleColors.relationship),
-        ]),
-        PermissionRow(role: "Cliente u observador", permissions: [
-            Permission(area: "Alcance aprobado", detail: "Consulta versiones compartidas.", level: "Lectura", systemImage: "eye.fill", color: TazkleColors.relationship),
-            Permission(area: "Solicitudes de cambio", detail: "Puede proponer nuevas implementaciones.", level: "Proponer", systemImage: "plus.bubble.fill", color: TazkleColors.actionPrimary),
-            Permission(area: "Costos internos", detail: "Nunca se exponen.", level: "Sin acceso", systemImage: "lock.fill", color: TazkleColors.warning),
-            Permission(area: "Precio aprobado", detail: "Visible cuando se comparte.", level: "Lectura", systemImage: "eye.fill", color: TazkleColors.relationship),
-        ]),
-    ]
-
-    static let syncStates = [
-        SyncState(title: "Guardado localmente", detail: "El cambio existe en SQLite", value: "Visible", icon: "internaldrive", color: TazkleColors.success),
-        SyncState(title: "Sincronizando", detail: "Envío y validación pendientes", value: "Futuro", icon: "arrow.triangle.2.circlepath", color: TazkleColors.actionPrimary),
-        SyncState(title: "Conflicto", detail: "Requiere decisión explícita", value: "Futuro", icon: "arrow.triangle.branch", color: TazkleColors.warning),
-        SyncState(title: "Rechazado", detail: "Permiso o regla de negocio", value: "Futuro", icon: "xmark.shield", color: TazkleColors.warning),
     ]
 }

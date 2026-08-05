@@ -211,6 +211,20 @@ enum RoleRateSaveState: Equatable {
     case error(String)
 }
 
+enum OrganizationPlanningDefaultsLoadState: Equatable {
+    case idle
+    case loading
+    case loaded
+    case offline
+    case error(String)
+}
+
+enum OrganizationPlanningDefaultsSaveState: Equatable {
+    case idle
+    case saving
+    case error(String)
+}
+
 @MainActor
 final class AppState: ObservableObject {
     @Published var graph: ProjectGraph
@@ -252,6 +266,9 @@ final class AppState: ObservableObject {
     @Published private(set) var roleRates: [RoleRate] = []
     @Published private(set) var roleRatesLoadState: RoleRatesLoadState = .idle
     @Published private(set) var roleRateSaveState: RoleRateSaveState = .idle
+    @Published private(set) var organizationPlanningDefaults: OrganizationPlanningDefaults?
+    @Published private(set) var organizationPlanningDefaultsLoadState: OrganizationPlanningDefaultsLoadState = .idle
+    @Published private(set) var organizationPlanningDefaultsSaveState: OrganizationPlanningDefaultsSaveState = .idle
 
     private var store: SQLiteProjectStore?
     private(set) var activeWorkspaceAccountID: String?
@@ -263,6 +280,8 @@ final class AppState: ObservableObject {
     init() {
         let initialProject = ProjectGraph(name: "Sin proyecto activo")
         graph = initialProject
+        // No session exists yet at construction time, so there are no real
+        // rates to seed with — this always falls back to the placeholder.
         planningProfile = ProjectPlanningProfile.defaultProfile(for: initialProject)
     }
 
@@ -285,7 +304,7 @@ final class AppState: ObservableObject {
                     try localStore.save(saved, template: latest.template)
                 }
                 planningProfile = try localStore.loadPlanningProfile(projectID: graph.id)
-                    ?? ProjectPlanningProfile.defaultProfile(for: graph)
+                    ?? ProjectPlanningProfile.defaultProfile(for: graph, roleRates: planningRoleRateSeeds)
                 clearMemoryProjects()
                 rememberCurrentProject()
                 try refreshAvailableProjects()
@@ -363,6 +382,30 @@ final class AppState: ObservableObject {
         roleRates.first?.organizationId ?? teamMembers.first?.organizationId
     }
 
+    /// Bridges the real organization-wide rates (`roleRates`, keyed by
+    /// `OrganizationRole`) into `ProjectPlanningProfile.defaultProfile`'s seed
+    /// dictionary (keyed by the narrower `PlanningRole`). Empty until
+    /// `loadRoleRates` has actually run, so callers before that (including
+    /// `AppState.init()`, which has no session yet) naturally fall back to
+    /// the placeholder rates baked into `defaultProfile`. `.operations` has
+    /// no `OrganizationRole` counterpart and always falls back.
+    private var planningRoleRateSeeds: [PlanningRole: Int] {
+        let mapping: [PlanningRole: OrganizationRole] = [
+            .product: .product,
+            .technicalLead: .technicalLead,
+            .design: .design,
+            .development: .development,
+            .quality: .qa,
+        ]
+        var seeds: [PlanningRole: Int] = [:]
+        for (planningRole, organizationRole) in mapping {
+            if let match = roleRates.first(where: { $0.role == organizationRole }) {
+                seeds[planningRole] = match.hourlyRateMXN
+            }
+        }
+        return seeds
+    }
+
     func loadRoleRates(using authentication: AuthenticationController) async {
         guard let issuer = authentication.configuration?.issuer,
               let baseURL = URL.platformGatewayBaseURL(fromIssuer: issuer)
@@ -432,6 +475,84 @@ final class AppState: ObservableObject {
         }
     }
 
+    func loadOrganizationPlanningDefaults(using authentication: AuthenticationController) async {
+        guard let organizationId = currentOrganizationID else {
+            organizationPlanningDefaultsLoadState = .error("Todavía no se pudo determinar tu organización.")
+            return
+        }
+        guard let issuer = authentication.configuration?.issuer,
+              let baseURL = URL.platformGatewayBaseURL(fromIssuer: issuer)
+        else {
+            organizationPlanningDefaultsLoadState = .error("No hay una sesión configurada para cargar los valores predeterminados.")
+            return
+        }
+
+        organizationPlanningDefaultsLoadState = .loading
+        do {
+            let accessToken = try await authentication.validAccessToken()
+            let client = PlatformAPIClient(baseURL: baseURL)
+            organizationPlanningDefaults = try await client.fetchOrganizationPlanningDefaults(
+                organizationId: organizationId,
+                accessToken: accessToken
+            )
+            organizationPlanningDefaultsLoadState = .loaded
+        } catch AuthenticationFailure.providerUnavailable {
+            organizationPlanningDefaultsLoadState = .offline
+        } catch is AuthenticationFailure {
+            organizationPlanningDefaultsLoadState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
+        } catch PlatformAPIError.unauthorized {
+            organizationPlanningDefaultsLoadState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
+        } catch {
+            organizationPlanningDefaultsLoadState = .error("No fue posible cargar los valores predeterminados. Inténtalo nuevamente.")
+        }
+    }
+
+    func saveOrganizationPlanningDefaults(
+        riskReservePercent: Int,
+        targetMarginPercent: Int,
+        workdayHours: Int,
+        allowFinanceRateEdits: Bool,
+        using authentication: AuthenticationController
+    ) async {
+        guard let organizationId = currentOrganizationID else {
+            organizationPlanningDefaultsSaveState = .error("Todavía no se pudo determinar tu organización.")
+            return
+        }
+        guard let issuer = authentication.configuration?.issuer,
+              let baseURL = URL.platformGatewayBaseURL(fromIssuer: issuer)
+        else {
+            organizationPlanningDefaultsSaveState = .error("No hay una sesión configurada para guardar los valores predeterminados.")
+            return
+        }
+
+        organizationPlanningDefaultsSaveState = .saving
+        do {
+            let accessToken = try await authentication.validAccessToken()
+            let client = PlatformAPIClient(baseURL: baseURL)
+            organizationPlanningDefaults = try await client.updateOrganizationPlanningDefaults(
+                organizationId: organizationId,
+                UpdateOrganizationPlanningDefaultsCommand(
+                    riskReservePercent: riskReservePercent,
+                    targetMarginPercent: targetMarginPercent,
+                    workdayHours: workdayHours,
+                    allowFinanceRateEdits: allowFinanceRateEdits
+                ),
+                accessToken: accessToken
+            )
+            organizationPlanningDefaultsSaveState = .idle
+        } catch AuthenticationFailure.providerUnavailable {
+            organizationPlanningDefaultsSaveState = .error("Sin conexión; los valores no se guardaron.")
+        } catch is AuthenticationFailure {
+            organizationPlanningDefaultsSaveState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
+        } catch PlatformAPIError.unauthorized {
+            organizationPlanningDefaultsSaveState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
+        } catch PlatformAPIError.forbidden {
+            organizationPlanningDefaultsSaveState = .error("Sólo un administrador de la organización puede capturar estos valores.")
+        } catch {
+            organizationPlanningDefaultsSaveState = .error("No fue posible guardar los valores. Inténtalo nuevamente.")
+        }
+    }
+
     var selectedBlock: ProjectBlock? {
         guard let selectedBlockID else { return nil }
         return graph.block(id: selectedBlockID)
@@ -494,7 +615,7 @@ final class AppState: ObservableObject {
             template: template,
             webTechnologies: webTechnologies
         )
-        let profile = ProjectPlanningProfile.defaultProfile(for: project)
+        let profile = ProjectPlanningProfile.defaultProfile(for: project, roleRates: planningRoleRateSeeds)
 
         do {
             try ProjectGraphValidator.validate(project)
@@ -542,10 +663,10 @@ final class AppState: ObservableObject {
             let loadedProfile: ProjectPlanningProfile
             if let store {
                 loadedProfile = try store.loadPlanningProfile(projectID: projectID)
-                    ?? ProjectPlanningProfile.defaultProfile(for: loaded)
+                    ?? ProjectPlanningProfile.defaultProfile(for: loaded, roleRates: planningRoleRateSeeds)
             } else {
                 loadedProfile = memoryPlanningProfiles[projectID]
-                    ?? ProjectPlanningProfile.defaultProfile(for: loaded)
+                    ?? ProjectPlanningProfile.defaultProfile(for: loaded, roleRates: planningRoleRateSeeds)
             }
             graph = loaded
             planningProfile = loadedProfile
@@ -1116,7 +1237,7 @@ final class AppState: ObservableObject {
     private func replaceWorkspaceWithPlaceholder(state: WorkspaceContentState) {
         let placeholder = ProjectGraph(name: "Sin proyecto activo")
         graph = placeholder
-        planningProfile = ProjectPlanningProfile.defaultProfile(for: placeholder)
+        planningProfile = ProjectPlanningProfile.defaultProfile(for: placeholder, roleRates: planningRoleRateSeeds)
         selectedProjectTemplate = .blankCanvas
         clearMemoryProjects()
         availableProjects = []

@@ -678,3 +678,126 @@ test("gateway rejects a role rate upsert without an idempotency key", async () =
   assert.equal(response.status, 400);
   assert.equal(internalCalls, 0);
 });
+
+test("gateway forwards organization planning defaults to the internal endpoint", async () => {
+  const organizationId = "550e8400-e29b-41d4-a716-446655440005";
+  let target = "";
+  const defaultsPayload = {
+    organizationId,
+    riskReservePercent: 10,
+    targetMarginPercent: 20,
+    workdayHours: 8,
+    allowFinanceRateEdits: false,
+    updatedAt: "2026-07-28T18:00:00.000Z",
+  };
+  const app = createGatewayApp({
+    urls,
+    accessTokens,
+    internalActors,
+    fetchImplementation: async (input) => {
+      target = input.toString();
+      return Response.json(defaultsPayload);
+    },
+  });
+
+  const response = await app.request(
+    `/v1/organizations/${organizationId}/planning-defaults`,
+    {
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer external.payload.signature",
+      },
+    },
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(
+    target,
+    `http://project-core.test/internal/v1/organizations/${organizationId}/planning-defaults`,
+  );
+  assert.deepEqual(await response.json(), defaultsPayload);
+});
+
+test("gateway forwards a planning defaults update with its idempotency key", async () => {
+  const organizationId = "550e8400-e29b-41d4-a716-446655440005";
+  let forwardedIdempotencyKey = "";
+  const updatePayload = {
+    defaults: {
+      organizationId,
+      riskReservePercent: 15,
+      targetMarginPercent: 25,
+      workdayHours: 8,
+      allowFinanceRateEdits: true,
+      updatedAt: "2026-07-28T18:00:00.000Z",
+    },
+    replayed: false,
+  };
+  const app = createGatewayApp({
+    urls,
+    accessTokens,
+    internalActors,
+    fetchImplementation: async (_input, init) => {
+      const headers = new Headers(init?.headers);
+      forwardedIdempotencyKey = headers.get("Idempotency-Key") ?? "";
+      return Response.json(updatePayload, { status: 201 });
+    },
+  });
+
+  const response = await app.request(
+    `/v1/organizations/${organizationId}/planning-defaults`,
+    {
+      method: "PUT",
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer external.payload.signature",
+        "Content-Type": "application/json",
+        "Idempotency-Key": "planning-defaults-upsert-0000000000000001",
+      },
+      body: JSON.stringify({
+        riskReservePercent: 15,
+        targetMarginPercent: 25,
+        workdayHours: 8,
+        allowFinanceRateEdits: true,
+      }),
+    },
+  );
+
+  assert.equal(response.status, 201);
+  assert.equal(forwardedIdempotencyKey, "planning-defaults-upsert-0000000000000001");
+  assert.deepEqual(await response.json(), updatePayload);
+});
+
+test("gateway rejects a planning defaults update without an idempotency key", async () => {
+  const organizationId = "550e8400-e29b-41d4-a716-446655440005";
+  let internalCalls = 0;
+  const app = createGatewayApp({
+    urls,
+    accessTokens,
+    internalActors,
+    fetchImplementation: async () => {
+      internalCalls += 1;
+      throw new Error("must not be called");
+    },
+  });
+
+  const response = await app.request(
+    `/v1/organizations/${organizationId}/planning-defaults`,
+    {
+      method: "PUT",
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer external.payload.signature",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        riskReservePercent: 15,
+        targetMarginPercent: 25,
+        workdayHours: 8,
+        allowFinanceRateEdits: true,
+      }),
+    },
+  );
+
+  assert.equal(response.status, 400);
+  assert.equal(internalCalls, 0);
+});

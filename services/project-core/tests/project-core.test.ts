@@ -8,6 +8,7 @@ import {
   type InternalActorVerifier,
 } from "../src/identity.js";
 import type { MemberRepository } from "../src/members.js";
+import type { OrganizationPlanningRepository } from "../src/organization-planning.js";
 import type { ProjectRepository } from "../src/projects.js";
 import type { RoleRateRepository } from "../src/role-rates.js";
 
@@ -69,6 +70,28 @@ const roleRates: RoleRateRepository = {
   }),
 };
 
+const organizationPlanning: OrganizationPlanningRepository = {
+  get: async (_actor, organizationId) => ({
+    organizationId,
+    riskReservePercent: 10,
+    targetMarginPercent: 20,
+    workdayHours: 8,
+    allowFinanceRateEdits: false,
+    updatedAt: "2026-07-28T18:00:00.000Z",
+  }),
+  update: async (_actor, organizationId, command) => ({
+    defaults: {
+      organizationId,
+      riskReservePercent: command.riskReservePercent,
+      targetMarginPercent: command.targetMarginPercent,
+      workdayHours: command.workdayHours,
+      allowFinanceRateEdits: command.allowFinanceRateEdits,
+      updatedAt: "2026-07-28T18:00:00.000Z",
+    },
+    replayed: false,
+  }),
+};
+
 test("project core is the only service declaring domain-write authority", async () => {
   const app = createProjectCoreApp({
     databaseProbe: async () => [{ name: "postgres", status: "available" }],
@@ -77,6 +100,7 @@ test("project core is the only service declaring domain-write authority", async 
     graph,
     members,
     roleRates,
+    organizationPlanning,
   });
 
   const response = await app.request("/internal/capabilities");
@@ -102,6 +126,7 @@ test("project core readiness reflects database failure without exposing details"
     graph,
     members,
     roleRates,
+    organizationPlanning,
   });
 
   const response = await app.request("/health/ready");
@@ -131,6 +156,7 @@ test("project core rejects a mutation without a signed internal actor", async ()
     graph,
     members,
     roleRates,
+    organizationPlanning,
   });
 
   const response = await app.request("/internal/v1/projects", {
@@ -167,6 +193,7 @@ test("project core creates a project from the narrow command contract", async ()
     graph,
     members,
     roleRates,
+    organizationPlanning,
   });
 
   const response = await app.request("/internal/v1/projects", {
@@ -203,6 +230,7 @@ test("project core rejects mass assignment fields", async () => {
     graph,
     members,
     roleRates,
+    organizationPlanning,
   });
 
   const response = await app.request("/internal/v1/projects", {
@@ -231,6 +259,7 @@ test("project core reads the project graph", async () => {
     graph,
     members,
     roleRates,
+    organizationPlanning,
   });
 
   const response = await app.request(
@@ -252,6 +281,7 @@ test("project core rejects a malformed project id", async () => {
     graph,
     members,
     roleRates,
+    organizationPlanning,
   });
 
   const response = await app.request(
@@ -277,6 +307,7 @@ test("project core replaces the project graph atomically", async () => {
     },
     members,
     roleRates,
+    organizationPlanning,
   });
 
   const blockId = "550e8400-e29b-41d4-a716-446655440003";
@@ -334,6 +365,7 @@ test("project core rejects a graph replace with a stale row version", async () =
     },
     members,
     roleRates,
+    organizationPlanning,
   });
 
   const response = await app.request(
@@ -364,6 +396,7 @@ test("project core rejects a graph replace with a self-relation", async () => {
     graph,
     members,
     roleRates,
+    organizationPlanning,
   });
 
   const blockId = "550e8400-e29b-41d4-a716-446655440003";
@@ -433,6 +466,7 @@ test("project core lists teammates across accessible organizations", async () =>
       }),
     },
     roleRates,
+    organizationPlanning,
   });
 
   const response = await app.request("/internal/v1/members", {
@@ -464,6 +498,7 @@ test("project core rejects a members list without a signed internal actor", asyn
       },
     },
     roleRates,
+    organizationPlanning,
   });
 
   const response = await app.request("/internal/v1/members");
@@ -493,6 +528,7 @@ test("project core lists role rates across accessible organizations", async () =
         ],
       }),
     },
+    organizationPlanning,
   });
 
   const response = await app.request("/internal/v1/role-rates", {
@@ -515,6 +551,7 @@ test("project core upserts a role rate with a signed internal actor", async () =
     graph,
     members,
     roleRates,
+    organizationPlanning,
   });
 
   const response = await app.request("/internal/v1/role-rates", {
@@ -556,6 +593,7 @@ test("project core rejects a role rate upsert from a non-admin actor", async () 
         );
       },
     },
+    organizationPlanning,
   });
 
   const response = await app.request("/internal/v1/role-rates", {
@@ -594,6 +632,7 @@ test("project core rejects a role rate upsert without a signed internal actor", 
         throw new Error("must not be called");
       },
     },
+    organizationPlanning,
   });
 
   const response = await app.request("/internal/v1/role-rates", {
@@ -608,6 +647,175 @@ test("project core rejects a role rate upsert without a signed internal actor", 
       hourlyRateMXN: 750,
     }),
   });
+
+  assert.equal(response.status, 401);
+  assert.equal(repositoryCalls, 0);
+});
+
+test("project core reads organization planning defaults", async () => {
+  const organizationId = "550e8400-e29b-41d4-a716-446655440005";
+  const app = createProjectCoreApp({
+    databaseProbe: async () => [],
+    actorVerifier,
+    projects,
+    graph,
+    members,
+    roleRates,
+    organizationPlanning,
+  });
+
+  const response = await app.request(
+    `/internal/v1/organizations/${organizationId}/planning-defaults`,
+    { headers: { Authorization: "Bearer internal.payload.signature" } },
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.organizationId, organizationId);
+  assert.equal(payload.riskReservePercent, 10);
+  assert.equal(payload.targetMarginPercent, 20);
+  assert.equal(payload.workdayHours, 8);
+  assert.equal(payload.allowFinanceRateEdits, false);
+});
+
+test("project core rejects a malformed organization id for planning defaults", async () => {
+  const app = createProjectCoreApp({
+    databaseProbe: async () => [],
+    actorVerifier,
+    projects,
+    graph,
+    members,
+    roleRates,
+    organizationPlanning,
+  });
+
+  const response = await app.request(
+    "/internal/v1/organizations/not-a-uuid/planning-defaults",
+    { headers: { Authorization: "Bearer internal.payload.signature" } },
+  );
+
+  assert.equal(response.status, 400);
+});
+
+test("project core updates organization planning defaults with a signed internal actor", async () => {
+  const organizationId = "550e8400-e29b-41d4-a716-446655440005";
+  const app = createProjectCoreApp({
+    databaseProbe: async () => [],
+    actorVerifier,
+    projects,
+    graph,
+    members,
+    roleRates,
+    organizationPlanning,
+  });
+
+  const response = await app.request(
+    `/internal/v1/organizations/${organizationId}/planning-defaults`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: "Bearer internal.payload.signature",
+        "Content-Type": "application/json",
+        "Idempotency-Key": "planning-defaults-upsert-0000000000000001",
+      },
+      body: JSON.stringify({
+        riskReservePercent: 15,
+        targetMarginPercent: 25,
+        workdayHours: 8,
+        allowFinanceRateEdits: true,
+      }),
+    },
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 201);
+  assert.equal(payload.defaults.riskReservePercent, 15);
+  assert.equal(payload.defaults.targetMarginPercent, 25);
+  assert.equal(payload.defaults.allowFinanceRateEdits, true);
+  assert.equal(payload.replayed, false);
+});
+
+test("project core rejects a planning defaults update from a non-admin actor", async () => {
+  const organizationId = "550e8400-e29b-41d4-a716-446655440005";
+  const app = createProjectCoreApp({
+    databaseProbe: async () => [],
+    actorVerifier,
+    projects,
+    graph,
+    members,
+    roleRates,
+    organizationPlanning: {
+      ...organizationPlanning,
+      update: async () => {
+        throw new ProjectOperationError(
+          403,
+          "ORGANIZATION_SETTINGS_FORBIDDEN",
+          "Sólo un administrador de la organización puede capturar estos valores.",
+        );
+      },
+    },
+  });
+
+  const response = await app.request(
+    `/internal/v1/organizations/${organizationId}/planning-defaults`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: "Bearer internal.payload.signature",
+        "Content-Type": "application/json",
+        "Idempotency-Key": "planning-defaults-upsert-0000000000000002",
+      },
+      body: JSON.stringify({
+        riskReservePercent: 15,
+        targetMarginPercent: 25,
+        workdayHours: 8,
+        allowFinanceRateEdits: true,
+      }),
+    },
+  );
+
+  assert.equal(response.status, 403);
+});
+
+test("project core rejects a planning defaults update without a signed internal actor", async () => {
+  let repositoryCalls = 0;
+  const organizationId = "550e8400-e29b-41d4-a716-446655440005";
+  const app = createProjectCoreApp({
+    databaseProbe: async () => [],
+    actorVerifier: {
+      verify: async () => {
+        throw new InternalAuthenticationError();
+      },
+    },
+    projects,
+    graph,
+    members,
+    roleRates,
+    organizationPlanning: {
+      ...organizationPlanning,
+      update: async () => {
+        repositoryCalls += 1;
+        throw new Error("must not be called");
+      },
+    },
+  });
+
+  const response = await app.request(
+    `/internal/v1/organizations/${organizationId}/planning-defaults`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": "planning-defaults-upsert-0000000000000003",
+      },
+      body: JSON.stringify({
+        riskReservePercent: 15,
+        targetMarginPercent: 25,
+        workdayHours: 8,
+        allowFinanceRateEdits: true,
+      }),
+    },
+  );
 
   assert.equal(response.status, 401);
   assert.equal(repositoryCalls, 0);
