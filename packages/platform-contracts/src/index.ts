@@ -384,6 +384,7 @@ export const organizationPlanningDefaultsSchema = z
     riskReservePercent: z.number().int().min(0).max(100),
     targetMarginPercent: z.number().int().min(0).max(100),
     workdayHours: z.number().int().min(1).max(24),
+    allowFinanceRateEdits: z.boolean(),
     updatedAt: z.string().datetime({ offset: true }),
   })
   .strict();
@@ -397,6 +398,7 @@ export const updateOrganizationPlanningDefaultsCommandSchema = z
     riskReservePercent: z.number().int().min(0).max(100),
     targetMarginPercent: z.number().int().min(0).max(100),
     workdayHours: z.number().int().min(1).max(24),
+    allowFinanceRateEdits: z.boolean(),
   })
   .strict();
 

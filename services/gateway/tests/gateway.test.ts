@@ -687,6 +687,7 @@ test("gateway forwards organization planning defaults to the internal endpoint",
     riskReservePercent: 10,
     targetMarginPercent: 20,
     workdayHours: 8,
+    allowFinanceRateEdits: false,
     updatedAt: "2026-07-28T18:00:00.000Z",
   };
   const app = createGatewayApp({
@@ -726,6 +727,7 @@ test("gateway forwards a planning defaults update with its idempotency key", asy
       riskReservePercent: 15,
       targetMarginPercent: 25,
       workdayHours: 8,
+      allowFinanceRateEdits: true,
       updatedAt: "2026-07-28T18:00:00.000Z",
     },
     replayed: false,
@@ -755,6 +757,7 @@ test("gateway forwards a planning defaults update with its idempotency key", asy
         riskReservePercent: 15,
         targetMarginPercent: 25,
         workdayHours: 8,
+        allowFinanceRateEdits: true,
       }),
     },
   );
@@ -790,6 +793,7 @@ test("gateway rejects a planning defaults update without an idempotency key", as
         riskReservePercent: 15,
         targetMarginPercent: 25,
         workdayHours: 8,
+        allowFinanceRateEdits: true,
       }),
     },
   );

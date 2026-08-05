@@ -485,6 +485,7 @@ final class AppState: ObservableObject {
         riskReservePercent: Int,
         targetMarginPercent: Int,
         workdayHours: Int,
+        allowFinanceRateEdits: Bool,
         using authentication: AuthenticationController
     ) async {
         guard let organizationId = currentOrganizationID else {
@@ -507,7 +508,8 @@ final class AppState: ObservableObject {
                 UpdateOrganizationPlanningDefaultsCommand(
                     riskReservePercent: riskReservePercent,
                     targetMarginPercent: targetMarginPercent,
-                    workdayHours: workdayHours
+                    workdayHours: workdayHours,
+                    allowFinanceRateEdits: allowFinanceRateEdits
                 ),
                 accessToken: accessToken
             )

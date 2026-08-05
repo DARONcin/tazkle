@@ -379,99 +379,28 @@ private struct CostsByRoleView: View {
 
 private struct CostsByModuleView: View {
     var body: some View {
-        VStack(spacing: TazkleSpacing.medium) {
-            ForEach(CostPrototype.modules) { module in
-                ProjectSectionCard(title: module.name, systemImage: module.systemImage) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(module.range)
-                                .font(.title3.weight(.semibold))
-                                .monospacedDigit()
-                            Text(module.detail)
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        ProjectStatusPill(
-                            title: module.confidence,
-                            systemImage: "chart.bar.fill",
-                            color: module.confidence == "Confianza alta" ? TazkleColors.success : TazkleColors.warning
-                        )
-                    }
-                    ProgressView(value: module.weight)
-                        .tint(module.color)
-                        .accessibilityLabel("Participación en el costo interno")
-                        .accessibilityValue("\(Int(module.weight * 100)) por ciento")
-                }
-            }
-        }
+        SectionUnavailableView(
+            title: "Costo por módulo pendiente",
+            detail: "Repartir el costo interno por módulo requiere horas y tarifas asociadas a cada bloque del mapa, que todavía no existen."
+        )
     }
 }
 
 private struct CostsServicesView: View {
-    @State private var includeOptional = false
-
     var body: some View {
-        VStack(alignment: .leading, spacing: TazkleSpacing.large) {
-            Toggle("Incluir servicios opcionales", isOn: $includeOptional)
-                .toggleStyle(.switch)
-
-            ProjectSectionCard(title: "Servicios y licencias", systemImage: "shippingbox") {
-                ScrollView(.horizontal) {
-                    Grid(alignment: .leading, horizontalSpacing: TazkleSpacing.xLarge, verticalSpacing: 0) {
-                        GridRow {
-                            heading("Concepto")
-                            heading("Frecuencia")
-                            heading("Costo")
-                            heading("Supuesto")
-                        }
-                        Divider().gridCellColumns(4)
-                        ForEach(CostPrototype.services.filter { includeOptional || !$0.optional }) { service in
-                            GridRow {
-                                Label(service.name, systemImage: service.systemImage)
-                                Text(service.frequency).foregroundStyle(.secondary)
-                                Text(service.cost).monospacedDigit()
-                                Text(service.assumption).foregroundStyle(.secondary)
-                            }
-                            .font(.callout)
-                            .padding(.vertical, TazkleSpacing.medium)
-                            Divider().gridCellColumns(4)
-                        }
-                    }
-                    .frame(minWidth: 720, alignment: .leading)
-                }
-            }
-        }
-    }
-
-    private func heading(_ value: String) -> some View {
-        Text(value).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+        SectionUnavailableView(
+            title: "Servicios y licencias pendientes",
+            detail: "Los costos periódicos de infraestructura y licencias todavía no tienen un registro real en Project Core."
+        )
     }
 }
 
 private struct CostsHistoryView: View {
     var body: some View {
-        ProjectSectionCard(title: "Historial del presupuesto", systemImage: "clock.arrow.circlepath") {
-            ForEach(CostPrototype.history) { entry in
-                HStack(alignment: .top, spacing: TazkleSpacing.medium) {
-                    ZStack {
-                        Circle().fill(entry.color.opacity(0.14)).frame(width: 34, height: 34)
-                        Image(systemName: entry.systemImage).foregroundStyle(entry.color)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(entry.title).font(.callout.weight(.semibold))
-                            Spacer()
-                            Text(entry.version).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                        }
-                        Text(entry.detail).font(.callout).foregroundStyle(.secondary)
-                        Text(entry.author).font(.caption).foregroundStyle(.tertiary)
-                    }
-                }
-                .padding(.vertical, TazkleSpacing.small)
-                Divider()
-            }
-        }
+        SectionUnavailableView(
+            title: "Historial del presupuesto pendiente",
+            detail: "El registro de cambios al presupuesto con causa, versión y responsable todavía no existe en Project Core."
+        )
     }
 }
 
@@ -573,105 +502,7 @@ private struct CostsProposalView: View {
     }
 }
 
-private struct CostScenario: Identifiable {
-    let id: String
-    let value: String
-    let detail: String
-    let color: Color
-}
-
-private struct CostDeviation: Identifiable {
-    let id = UUID()
-    let title: String
-    let detail: String
-    let impact: String
-    let level: String
-}
-
-private struct CostRole: Identifiable {
-    let id = UUID()
-    let name: String
-    let plannedHours: Int
-    let actualHours: Int
-    let rate: String
-    let plannedCost: String
-    let variance: String
-}
-
-private struct CostModule: Identifiable {
-    let id = UUID()
-    let name: String
-    let systemImage: String
-    let range: String
-    let detail: String
-    let confidence: String
-    let weight: Double
-    let color: Color
-}
-
-private struct CostService: Identifiable {
-    let id = UUID()
-    let name: String
-    let systemImage: String
-    let frequency: String
-    let cost: String
-    let assumption: String
-    let optional: Bool
-}
-
-private struct CostHistoryEntry: Identifiable {
-    let id = UUID()
-    let title: String
-    let version: String
-    let detail: String
-    let author: String
-    let systemImage: String
-    let color: Color
-}
-
 private enum CostPrototype {
-    static let scenarios = [
-        CostScenario(id: "P90", value: "$735k MXN", detail: "Escenario conservador con mayor incertidumbre cubierta.", color: TazkleColors.warning),
-        CostScenario(id: "P50", value: "$655k MXN", detail: "Escenario base bajo los supuestos actuales.", color: TazkleColors.success),
-        CostScenario(id: "P10", value: "$575k MXN", detail: "Escenario optimista; no debe presentarse como garantía.", color: TazkleColors.relationship),
-    ]
-
-    static let deviations = [
-        CostDeviation(title: "Alcance en crecimiento", detail: "Dos funcionalidades nuevas incrementan el esfuerzo.", impact: "+$12k", level: "Alto"),
-        CostDeviation(title: "Eficiencia del equipo", detail: "La productividad observada coincide con el escenario base.", impact: "$0", level: "Bajo"),
-        CostDeviation(title: "Servicios en la nube", detail: "El consumo previsto supera el plan inicial.", impact: "+$6k", level: "Medio"),
-    ]
-
-    static let roles = [
-        CostRole(name: "Responsable técnico", plannedHours: 240, actualHours: 198, rate: "$120/h", plannedCost: "$28,800", variance: "−$5,040"),
-        CostRole(name: "Diseño", plannedHours: 160, actualHours: 142, rate: "$90/h", plannedCost: "$14,400", variance: "−$1,620"),
-        CostRole(name: "Desarrollo", plannedHours: 560, actualHours: 480, rate: "$85/h", plannedCost: "$47,600", variance: "−$6,800"),
-        CostRole(name: "QA", plannedHours: 160, actualHours: 128, rate: "$70/h", plannedCost: "$11,200", variance: "−$2,240"),
-        CostRole(name: "DevOps", plannedHours: 80, actualHours: 64, rate: "$110/h", plannedCost: "$8,800", variance: "−$1,760"),
-        CostRole(name: "Producto", plannedHours: 60, actualHours: 52, rate: "$80/h", plannedCost: "$4,800", variance: "−$640"),
-    ]
-
-    static let modules = [
-        CostModule(name: "Módulo de usuarios", systemImage: "person.2", range: "$145k–$180k", detail: "Registro, autenticación y perfiles.", confidence: "Confianza alta", weight: 0.28, color: TazkleColors.relationship),
-        CostModule(name: "API", systemImage: "chevron.left.forwardslash.chevron.right", range: "$120k–$165k", detail: "Servicios, validación y documentación.", confidence: "Confianza media", weight: 0.24, color: TazkleColors.actionPrimary),
-        CostModule(name: "Datos", systemImage: "cylinder", range: "$90k–$130k", detail: "Persistencia, migraciones y recuperación.", confidence: "Confianza media", weight: 0.19, color: TazkleColors.success),
-        CostModule(name: "Operación", systemImage: "cloud", range: "$70k–$110k", detail: "Infraestructura, monitoreo y release.", confidence: "Confianza media", weight: 0.16, color: TazkleColors.assistantProposal),
-    ]
-
-    static let services = [
-        CostService(name: "Neon", systemImage: "cylinder", frequency: "Mensual", cost: "$4,800", assumption: "Escenario base", optional: false),
-        CostService(name: "PowerSync", systemImage: "arrow.triangle.2.circlepath", frequency: "Mensual", cost: "$3,600", assumption: "Sincronización inicial", optional: false),
-        CostService(name: "Almacenamiento R2", systemImage: "externaldrive", frequency: "Mensual", cost: "$1,200", assumption: "250 GB", optional: false),
-        CostService(name: "Monitoreo avanzado", systemImage: "waveform.path.ecg", frequency: "Mensual", cost: "$2,900", assumption: "Retención de 30 días", optional: true),
-        CostService(name: "Soporte prioritario", systemImage: "person.fill.questionmark", frequency: "Anual", cost: "$18,000", assumption: "Proveedor externo", optional: true),
-    ]
-
-    static let history = [
-        CostHistoryEntry(title: "Escenario base generado", version: "v1", detail: "Estimación inicial a partir de horas por rol.", author: "Carlos Ruiz · Responsable técnico", systemImage: "plus.circle", color: TazkleColors.actionPrimary),
-        CostHistoryEntry(title: "Reserva incrementada al 15%", version: "v2", detail: "Se añadió cobertura para riesgos de integración.", author: "Finanzas", systemImage: "shield", color: TazkleColors.warning),
-        CostHistoryEntry(title: "Alternativa administrada comparada", version: "v3", detail: "La variante reduce tiempo y aumenta servicios periódicos.", author: "Tazki · propuesta pendiente de aprobación", systemImage: "sparkles", color: TazkleColors.relationship),
-    ]
-
     static func destination(_ id: String) -> SectionDestination {
         AppSection.costs.contextualDestinations.first { $0.id == id }
             ?? AppSection.costs.contextualDestinations[0]

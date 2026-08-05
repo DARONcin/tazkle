@@ -5,6 +5,7 @@ public struct OrganizationPlanningDefaults: Identifiable, Codable, Equatable, Ha
     public let riskReservePercent: Int
     public let targetMarginPercent: Int
     public let workdayHours: Int
+    public let allowFinanceRateEdits: Bool
     public let updatedAt: Date
 
     public var id: UUID { organizationId }
@@ -14,12 +15,14 @@ public struct OrganizationPlanningDefaults: Identifiable, Codable, Equatable, Ha
         riskReservePercent: Int,
         targetMarginPercent: Int,
         workdayHours: Int,
+        allowFinanceRateEdits: Bool,
         updatedAt: Date
     ) {
         self.organizationId = organizationId
         self.riskReservePercent = riskReservePercent
         self.targetMarginPercent = targetMarginPercent
         self.workdayHours = workdayHours
+        self.allowFinanceRateEdits = allowFinanceRateEdits
         self.updatedAt = updatedAt
     }
 }
@@ -28,11 +31,18 @@ public struct UpdateOrganizationPlanningDefaultsCommand: Codable, Equatable, Sen
     public let riskReservePercent: Int
     public let targetMarginPercent: Int
     public let workdayHours: Int
+    public let allowFinanceRateEdits: Bool
 
-    public init(riskReservePercent: Int, targetMarginPercent: Int, workdayHours: Int) {
+    public init(
+        riskReservePercent: Int,
+        targetMarginPercent: Int,
+        workdayHours: Int,
+        allowFinanceRateEdits: Bool
+    ) {
         self.riskReservePercent = riskReservePercent
         self.targetMarginPercent = targetMarginPercent
         self.workdayHours = workdayHours
+        self.allowFinanceRateEdits = allowFinanceRateEdits
     }
 }
 

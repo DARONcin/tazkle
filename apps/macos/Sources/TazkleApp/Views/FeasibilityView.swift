@@ -409,244 +409,41 @@ private struct FeasibilityDimensionRow: View {
 
 private struct FeasibilityEvidenceView: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: TazkleSpacing.xLarge) {
-            LazyVGrid(
-                columns: ProjectGridLayout.equalColumns(3, minimumWidth: 180),
-                spacing: TazkleSpacing.medium
-            ) {
-                ProjectMetricCard(title: "Fuentes registradas", value: "8", detail: "Documentos y decisiones", systemImage: "doc.on.doc", accent: TazkleColors.actionPrimary)
-                ProjectMetricCard(title: "Con evidencia fuerte", value: "4", detail: "Dimensiones respaldadas", systemImage: "checkmark.seal", accent: TazkleColors.success)
-                ProjectMetricCard(title: "Vacíos críticos", value: "3", detail: "Antes de solicitar aprobación", systemImage: "exclamationmark.triangle", accent: TazkleColors.warning)
-            }
-
-            ProjectSectionCard(title: "Registro de evidencias", systemImage: "doc.text.magnifyingglass") {
-                ForEach(FeasibilityPrototype.evidence) { evidence in
-                    ProjectListRow {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Label(evidence.title, systemImage: evidence.systemImage)
-                                .font(.callout.weight(.medium))
-                            Text(evidence.supports)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    } trailing: {
-                        ProjectStatusPill(
-                            title: evidence.strength,
-                            systemImage: evidence.strength == "Fuerte" ? "checkmark.circle.fill" : "circle.lefthalf.filled",
-                            color: evidence.strength == "Fuerte" ? TazkleColors.success : TazkleColors.warning
-                        )
-                    }
-                }
-            }
-        }
+        SectionUnavailableView(
+            title: "Evidencias pendientes",
+            detail: "El registro de fuentes que respaldan la evaluación todavía no existe en Project Core."
+        )
     }
 }
 
 private struct FeasibilityAssumptionsView: View {
-    @State private var showResolved = true
-
     var body: some View {
-        VStack(alignment: .leading, spacing: TazkleSpacing.large) {
-            Toggle("Mostrar supuestos resueltos", isOn: $showResolved)
-                .toggleStyle(.switch)
-
-            ForEach(FeasibilityPrototype.assumptions.filter { showResolved || !$0.resolved }) { assumption in
-                ProjectSectionCard(title: assumption.title, systemImage: "text.bubble") {
-                    HStack {
-                        ProjectStatusPill(
-                            title: assumption.resolved ? "Validado" : "Por confirmar",
-                            systemImage: assumption.resolved ? "checkmark.circle.fill" : "questionmark.circle.fill",
-                            color: assumption.resolved ? TazkleColors.success : TazkleColors.warning
-                        )
-                        Spacer()
-                        Text(assumption.impact)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    Text(assumption.detail)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
+        SectionUnavailableView(
+            title: "Supuestos pendientes",
+            detail: "Las condiciones no verificadas que modifican costo, tiempo o riesgo todavía no se registran en Project Core."
+        )
     }
 }
 
 private struct FeasibilityAlternativesView: View {
-    @State private var selected = "Servicios administrados"
-
     var body: some View {
-        VStack(alignment: .leading, spacing: TazkleSpacing.xLarge) {
-            Picker("Variante", selection: $selected) {
-                Text("Arquitectura actual").tag("Arquitectura actual")
-                Text("Servicios administrados").tag("Servicios administrados")
-            }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 520)
-
-            LazyVGrid(
-                columns: ProjectGridLayout.equalColumns(4),
-                spacing: TazkleSpacing.medium
-            ) {
-                ProjectMetricCard(title: "Costo interno", value: selected == "Servicios administrados" ? "$610k" : "$655k", detail: "Rango base de demostración", systemImage: "dollarsign.circle", accent: TazkleColors.warning)
-                ProjectMetricCard(title: "Tiempo", value: selected == "Servicios administrados" ? "14 sem" : "17 sem", detail: "Hasta primera producción", systemImage: "calendar", accent: TazkleColors.actionPrimary)
-                ProjectMetricCard(title: "Riesgo técnico", value: selected == "Servicios administrados" ? "Medio" : "Alto", detail: "Dependencias críticas", systemImage: "exclamationmark.triangle", accent: TazkleColors.warning)
-                ProjectMetricCard(title: "Operación", value: selected == "Servicios administrados" ? "Menor" : "Mayor", detail: "Capacidad especializada", systemImage: "gearshape.2", accent: TazkleColors.relationship)
-            }
-
-            ProjectSectionCard(title: "Diferencias principales", systemImage: "arrow.left.arrow.right") {
-                ScrollView(.horizontal) {
-                    Grid(alignment: .leading, horizontalSpacing: TazkleSpacing.large) {
-                        comparison("Autenticación", current: "Implementación propia", alternative: "Servicio administrado")
-                        comparison("Base de datos", current: "Operación del equipo", alternative: "Copias y escalado administrados")
-                        comparison("Costo periódico", current: "Más bajo al inicio", alternative: "Mayor, pero predecible")
-                        comparison("Tiempo de entrega", current: "Más desarrollo", alternative: "Tres semanas menos")
-                    }
-                    .frame(minWidth: 680, alignment: .leading)
-                }
-            }
-        }
-    }
-
-    private func comparison(_ name: String, current: String, alternative: String) -> some View {
-        GridRow {
-            Text(name).font(.callout.weight(.semibold))
-            Text(current).font(.callout).foregroundStyle(.secondary)
-            Image(systemName: "arrow.right").foregroundStyle(.tertiary)
-            Text(alternative).font(.callout).foregroundStyle(.secondary)
-        }
-        .padding(.vertical, TazkleSpacing.small)
+        SectionUnavailableView(
+            title: "Alternativas pendientes",
+            detail: "Comparar variantes de arquitectura sin sobrescribir el plan original todavía no está conectado a Project Core."
+        )
     }
 }
 
 private struct FeasibilityApprovalView: View {
-    @State private var economic = true
-    @State private var capacity = false
-    @State private var architecture = false
-    @State private var reviewSent = false
-
-    private var canSubmit: Bool {
-        economic && capacity && architecture
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: TazkleSpacing.xLarge) {
-            ProjectSectionCard(title: "Puerta de aprobación", systemImage: "checkmark.shield") {
-                Toggle("Factibilidad económica revisada", isOn: $economic)
-                Toggle("Roles cubiertos sin sobrecarga no autorizada", isOn: $capacity)
-                Toggle("Arquitectura coherente y riesgos críticos tratados", isOn: $architecture)
-            }
-
-            ProjectSectionCard(title: "Responsable de la decisión", systemImage: "person.crop.circle.badge.checkmark") {
-                Label("Carlos Ruiz · Responsable técnico", systemImage: "person.crop.circle.fill")
-                    .font(.headline)
-                Text("La política del proyecto permite que el responsable final solicite la revisión después de que las tres verificaciones obligatorias estén satisfechas.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-
-            if reviewSent {
-                Label("Solicitud preparada en el prototipo", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(TazkleColors.success)
-                    .font(.headline)
-            }
-
-            Button("Enviar a revisión") {
-                reviewSent = true
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(TazkleColors.relationship)
-            .disabled(!canSubmit)
-            .accessibilityHint(canSubmit ? "Prepara la solicitud de revisión" : "Completa las tres verificaciones obligatorias")
-        }
+        SectionUnavailableView(
+            title: "Aprobación pendiente",
+            detail: "La puerta de revisión con responsable, condiciones y excepción documentada todavía no existe en Project Core."
+        )
     }
-}
-
-private enum FeasibilityStatus {
-    case favorable
-    case conditional
-    case risky
-
-    var title: String {
-        switch self {
-        case .favorable: "Favorable"
-        case .conditional: "Con condiciones"
-        case .risky: "Riesgoso"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .favorable: "checkmark.circle.fill"
-        case .conditional: "exclamationmark.circle.fill"
-        case .risky: "xmark.octagon.fill"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .favorable: TazkleColors.success
-        case .conditional: TazkleColors.warning
-        case .risky: TazkleColors.critical
-        }
-    }
-}
-
-private struct FeasibilityDimension: Identifiable {
-    let id = UUID()
-    let index: Int
-    let name: String
-    let status: FeasibilityStatus
-    let evidence: String
-    let confidence: String
-    let finding: String
-}
-
-private struct FeasibilityEvidence: Identifiable {
-    let id = UUID()
-    let title: String
-    let supports: String
-    let strength: String
-    let systemImage: String
-}
-
-private struct FeasibilityAssumption: Identifiable {
-    let id = UUID()
-    let title: String
-    let detail: String
-    let impact: String
-    let resolved: Bool
 }
 
 private enum FeasibilityPrototype {
-    static let dimensions = [
-        FeasibilityDimension(index: 1, name: "Problema y objetivos", status: .favorable, evidence: "Fuerte", confidence: "Alta", finding: "El problema está definido y alineado con los objetivos del producto."),
-        FeasibilityDimension(index: 2, name: "Alcance y complejidad", status: .favorable, evidence: "Fuerte", confidence: "Alta", finding: "El alcance inicial está delimitado; los cambios requieren control de versión."),
-        FeasibilityDimension(index: 3, name: "Viabilidad técnica", status: .conditional, evidence: "Media", confidence: "Media", finding: "La solución es viable, pero exige validar rendimiento y recuperación."),
-        FeasibilityDimension(index: 4, name: "Compatibilidad tecnológica", status: .conditional, evidence: "Media", confidence: "Media", finding: "Las integraciones son compatibles bajo los supuestos actuales."),
-        FeasibilityDimension(index: 5, name: "Capacidad y experiencia", status: .conditional, evidence: "Media", confidence: "Media", finding: "Falta cubrir Diseño y eliminar una sobrecarga de Backend."),
-        FeasibilityDimension(index: 6, name: "Tiempo disponible", status: .conditional, evidence: "Media", confidence: "Media", finding: "El calendario es alcanzable si se resuelven dependencias antes del sprint 2."),
-        FeasibilityDimension(index: 7, name: "Presupuesto", status: .conditional, evidence: "Media", confidence: "Media", finding: "El presupuesto admite el escenario base con una reserva del 15%."),
-        FeasibilityDimension(index: 8, name: "Riesgos y dependencias", status: .risky, evidence: "Débil", confidence: "Baja", finding: "Persisten dependencias críticas sin evidencia de mitigación."),
-        FeasibilityDimension(index: 9, name: "Necesidad o mercado", status: .conditional, evidence: "Media", confidence: "Media", finding: "Existe necesidad aparente, pendiente de validar con evidencia del mercado."),
-        FeasibilityDimension(index: 10, name: "Seguridad y cumplimiento", status: .favorable, evidence: "Fuerte", confidence: "Alta", finding: "La propuesta contempla controles base, auditoría y minimización de datos."),
-    ]
-
-    static let evidence = [
-        FeasibilityEvidence(title: "Expediente de alcance v1", supports: "Problema, objetivos y alcance", strength: "Fuerte", systemImage: "doc.text"),
-        FeasibilityEvidence(title: "Diagrama de arquitectura", supports: "Viabilidad y compatibilidad técnica", strength: "Media", systemImage: "square.3.layers.3d"),
-        FeasibilityEvidence(title: "Matriz de capacidad", supports: "Equipo y tiempo disponible", strength: "Media", systemImage: "person.2"),
-        FeasibilityEvidence(title: "Estimación de costos", supports: "Presupuesto y reserva", strength: "Media", systemImage: "dollarsign.circle"),
-        FeasibilityEvidence(title: "Revisión de seguridad", supports: "Privacidad, controles y cumplimiento", strength: "Fuerte", systemImage: "lock.shield"),
-    ]
-
-    static let assumptions = [
-        FeasibilityAssumption(title: "Volumen inicial moderado", detail: "La estimación supone hasta 25 000 personas activas al mes durante el primer año.", impact: "Costo e infraestructura", resolved: false),
-        FeasibilityAssumption(title: "Equipo disponible desde el sprint 1", detail: "Las personas asignadas mantienen al menos el 70% de su capacidad prevista.", impact: "Tiempo", resolved: false),
-        FeasibilityAssumption(title: "Proveedor de correo compatible", detail: "La API seleccionada cubre entrega transaccional y trazabilidad básica.", impact: "Tecnología", resolved: true),
-        FeasibilityAssumption(title: "Sin migración histórica masiva", detail: "El primer release no incluye importar más de 100 000 registros heredados.", impact: "Alcance", resolved: true),
-    ]
-
     static func destination(_ id: String) -> SectionDestination {
         AppSection.feasibility.contextualDestinations.first { $0.id == id }
             ?? AppSection.feasibility.contextualDestinations[0]

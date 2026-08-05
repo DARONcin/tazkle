@@ -29,6 +29,7 @@ type OrganizationPlanningRow = {
   risk_reserve_percent: number;
   target_margin_percent: number;
   workday_hours: number;
+  allow_finance_rate_edits: boolean;
   updated_at: Date | string;
 };
 
@@ -43,7 +44,7 @@ export function createPostgresOrganizationPlanningRepository(
         await resolveActor(client, actor);
         const result = await client.query<OrganizationPlanningRow>(
           `SELECT id, risk_reserve_percent, target_margin_percent,
-                  workday_hours, updated_at
+                  workday_hours, allow_finance_rate_edits, updated_at
              FROM tazkle.organizations
             WHERE id = $1`,
           [organizationId],
@@ -122,15 +123,17 @@ export function createPostgresOrganizationPlanningRepository(
               SET risk_reserve_percent = $2,
                   target_margin_percent = $3,
                   workday_hours = $4,
+                  allow_finance_rate_edits = $5,
                   updated_at = now()
             WHERE id = $1
         RETURNING id, risk_reserve_percent, target_margin_percent,
-                  workday_hours, updated_at`,
+                  workday_hours, allow_finance_rate_edits, updated_at`,
           [
             organizationId,
             command.riskReservePercent,
             command.targetMarginPercent,
             command.workdayHours,
+            command.allowFinanceRateEdits,
           ],
         );
 
@@ -214,6 +217,7 @@ function defaultsFromRow(row: OrganizationPlanningRow): OrganizationPlanningDefa
     riskReservePercent: row.risk_reserve_percent,
     targetMarginPercent: row.target_margin_percent,
     workdayHours: row.workday_hours,
+    allowFinanceRateEdits: row.allow_finance_rate_edits,
     updatedAt,
   };
 }

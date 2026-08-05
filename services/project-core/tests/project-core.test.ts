@@ -76,6 +76,7 @@ const organizationPlanning: OrganizationPlanningRepository = {
     riskReservePercent: 10,
     targetMarginPercent: 20,
     workdayHours: 8,
+    allowFinanceRateEdits: false,
     updatedAt: "2026-07-28T18:00:00.000Z",
   }),
   update: async (_actor, organizationId, command) => ({
@@ -84,6 +85,7 @@ const organizationPlanning: OrganizationPlanningRepository = {
       riskReservePercent: command.riskReservePercent,
       targetMarginPercent: command.targetMarginPercent,
       workdayHours: command.workdayHours,
+      allowFinanceRateEdits: command.allowFinanceRateEdits,
       updatedAt: "2026-07-28T18:00:00.000Z",
     },
     replayed: false,
@@ -673,6 +675,7 @@ test("project core reads organization planning defaults", async () => {
   assert.equal(payload.riskReservePercent, 10);
   assert.equal(payload.targetMarginPercent, 20);
   assert.equal(payload.workdayHours, 8);
+  assert.equal(payload.allowFinanceRateEdits, false);
 });
 
 test("project core rejects a malformed organization id for planning defaults", async () => {
@@ -719,6 +722,7 @@ test("project core updates organization planning defaults with a signed internal
         riskReservePercent: 15,
         targetMarginPercent: 25,
         workdayHours: 8,
+        allowFinanceRateEdits: true,
       }),
     },
   );
@@ -727,6 +731,7 @@ test("project core updates organization planning defaults with a signed internal
   assert.equal(response.status, 201);
   assert.equal(payload.defaults.riskReservePercent, 15);
   assert.equal(payload.defaults.targetMarginPercent, 25);
+  assert.equal(payload.defaults.allowFinanceRateEdits, true);
   assert.equal(payload.replayed, false);
 });
 
@@ -764,6 +769,7 @@ test("project core rejects a planning defaults update from a non-admin actor", a
         riskReservePercent: 15,
         targetMarginPercent: 25,
         workdayHours: 8,
+        allowFinanceRateEdits: true,
       }),
     },
   );
@@ -806,6 +812,7 @@ test("project core rejects a planning defaults update without a signed internal 
         riskReservePercent: 15,
         targetMarginPercent: 25,
         workdayHours: 8,
+        allowFinanceRateEdits: true,
       }),
     },
   );
