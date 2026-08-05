@@ -502,6 +502,8 @@ final class AppState: ObservableObject {
             organizationPlanningDefaultsLoadState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
         } catch PlatformAPIError.unauthorized {
             organizationPlanningDefaultsLoadState = .error("Tu sesión ya no es válida. Vuelve a iniciar sesión desde Configuración.")
+        } catch PlatformAPIError.forbidden {
+            organizationPlanningDefaultsLoadState = .error("No tienes permiso para ver estos valores de costeo interno.")
         } catch {
             organizationPlanningDefaultsLoadState = .error("No fue posible cargar los valores predeterminados. Inténtalo nuevamente.")
         }
