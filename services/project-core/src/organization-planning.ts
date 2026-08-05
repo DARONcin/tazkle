@@ -42,6 +42,19 @@ export function createPostgresOrganizationPlanningRepository(
       try {
         await client.query("BEGIN");
         await resolveActor(client, actor);
+
+        const authorized = await client.query<{ can_view: boolean }>(
+          "SELECT tazkle.can_view_organization_planning_defaults($1) AS can_view",
+          [organizationId],
+        );
+        if (!authorized.rows[0]?.can_view) {
+          throw new ProjectOperationError(
+            403,
+            "ORGANIZATION_PLANNING_FORBIDDEN",
+            "No tienes permiso para ver estos valores de costeo interno.",
+          );
+        }
+
         const result = await client.query<OrganizationPlanningRow>(
           `SELECT id, risk_reserve_percent, target_margin_percent,
                   workday_hours, allow_finance_rate_edits, updated_at

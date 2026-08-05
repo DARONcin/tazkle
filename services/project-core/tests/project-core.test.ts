@@ -777,6 +777,35 @@ test("project core rejects a planning defaults update from a non-admin actor", a
   assert.equal(response.status, 403);
 });
 
+test("project core rejects reading planning defaults for a client-role actor", async () => {
+  const organizationId = "550e8400-e29b-41d4-a716-446655440005";
+  const app = createProjectCoreApp({
+    databaseProbe: async () => [],
+    actorVerifier,
+    projects,
+    graph,
+    members,
+    roleRates,
+    organizationPlanning: {
+      ...organizationPlanning,
+      get: async () => {
+        throw new ProjectOperationError(
+          403,
+          "ORGANIZATION_PLANNING_FORBIDDEN",
+          "No tienes permiso para ver estos valores de costeo interno.",
+        );
+      },
+    },
+  });
+
+  const response = await app.request(
+    `/internal/v1/organizations/${organizationId}/planning-defaults`,
+    { headers: { Authorization: "Bearer internal.payload.signature" } },
+  );
+
+  assert.equal(response.status, 403);
+});
+
 test("project core rejects a planning defaults update without a signed internal actor", async () => {
   let repositoryCalls = 0;
   const organizationId = "550e8400-e29b-41d4-a716-446655440005";
