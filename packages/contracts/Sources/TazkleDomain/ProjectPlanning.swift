@@ -86,12 +86,27 @@ public struct ProjectPlanningProfile: Codable, Equatable, Sendable {
         self.rowVersion = rowVersion
     }
 
-    public static func defaultProfile(for graph: ProjectGraph) -> ProjectPlanningProfile {
+    /// Builds a starting planning profile. `roleRates` seeds the hourly rate
+    /// per role from the organization's real captured rates (Configuración →
+    /// Costos y tarifas) when the caller already has them loaded; any role
+    /// missing from `roleRates` (including always for `.operations`, which
+    /// has no equivalent in the organization-wide role list) falls back to
+    /// this placeholder rate. Hours remain a rough formula from block count —
+    /// associating real hours per role to each block is a separate,
+    /// still-unsolved problem.
+    public static func defaultProfile(
+        for graph: ProjectGraph,
+        roleRates: [PlanningRole: Int] = [:]
+    ) -> ProjectPlanningProfile {
         let scopeUnits = max(graph.blocks.count, 1)
         let technicalUnits = max(
             graph.blocks.count { $0.family == .technology },
             1
         )
+
+        func rate(_ role: PlanningRole, fallback: Int) -> Int {
+            roleRates[role] ?? fallback
+        }
 
         return ProjectPlanningProfile(
             projectID: graph.id,
@@ -99,32 +114,32 @@ public struct ProjectPlanningProfile: Codable, Equatable, Sendable {
                 RoleEstimate(
                     role: .product,
                     plannedHours: 32 + scopeUnits * 4,
-                    hourlyRateMXN: 800
+                    hourlyRateMXN: rate(.product, fallback: 800)
                 ),
                 RoleEstimate(
                     role: .technicalLead,
                     plannedHours: 40 + technicalUnits * 8,
-                    hourlyRateMXN: 1_200
+                    hourlyRateMXN: rate(.technicalLead, fallback: 1_200)
                 ),
                 RoleEstimate(
                     role: .design,
                     plannedHours: 48 + scopeUnits * 6,
-                    hourlyRateMXN: 900
+                    hourlyRateMXN: rate(.design, fallback: 900)
                 ),
                 RoleEstimate(
                     role: .development,
                     plannedHours: 80 + scopeUnits * 20,
-                    hourlyRateMXN: 850
+                    hourlyRateMXN: rate(.development, fallback: 850)
                 ),
                 RoleEstimate(
                     role: .quality,
                     plannedHours: 32 + scopeUnits * 8,
-                    hourlyRateMXN: 700
+                    hourlyRateMXN: rate(.quality, fallback: 700)
                 ),
                 RoleEstimate(
                     role: .operations,
                     plannedHours: 24 + technicalUnits * 6,
-                    hourlyRateMXN: 1_100
+                    hourlyRateMXN: rate(.operations, fallback: 1_100)
                 ),
             ]
         )

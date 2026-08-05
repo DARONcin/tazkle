@@ -74,6 +74,31 @@ final class ProjectPlanningTests: XCTestCase {
         XCTAssertFalse(assessment.conditions.isEmpty)
     }
 
+    func testDefaultProfileSeedsRatesFromOrganizationRolesButKeepsFallbackForOperations() {
+        let graph = ProjectGraph(name: "Con tarifas reales")
+        let profile = ProjectPlanningProfile.defaultProfile(
+            for: graph,
+            roleRates: [.product: 950, .development: 999]
+        )
+
+        func rate(_ role: PlanningRole) -> Int? {
+            profile.roles.first { $0.role == role }?.hourlyRateMXN
+        }
+
+        XCTAssertEqual(rate(.product), 950)
+        XCTAssertEqual(rate(.development), 999)
+        XCTAssertEqual(rate(.technicalLead), 1_200, "sin tarifa real capturada, conserva el valor de partida")
+        XCTAssertEqual(rate(.operations), 1_100, "operations no tiene equivalente en OrganizationRole; siempre usa el valor de partida")
+    }
+
+    func testDefaultProfileWithoutRealRatesMatchesThePreviousHardcodedBehavior() {
+        let graph = ProjectGraph(name: "Sin tarifas reales")
+        let profile = ProjectPlanningProfile.defaultProfile(for: graph)
+
+        XCTAssertEqual(profile.roles.first { $0.role == .product }?.hourlyRateMXN, 800)
+        XCTAssertEqual(profile.roles.first { $0.role == .development }?.hourlyRateMXN, 850)
+    }
+
     func testRejectsDuplicateRoles() {
         let graph = ProjectGraph(name: "Duplicado")
         var profile = ProjectPlanningProfile.defaultProfile(for: graph)

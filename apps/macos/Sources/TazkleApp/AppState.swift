@@ -280,6 +280,8 @@ final class AppState: ObservableObject {
     init() {
         let initialProject = ProjectGraph(name: "Sin proyecto activo")
         graph = initialProject
+        // No session exists yet at construction time, so there are no real
+        // rates to seed with — this always falls back to the placeholder.
         planningProfile = ProjectPlanningProfile.defaultProfile(for: initialProject)
     }
 
@@ -302,7 +304,7 @@ final class AppState: ObservableObject {
                     try localStore.save(saved, template: latest.template)
                 }
                 planningProfile = try localStore.loadPlanningProfile(projectID: graph.id)
-                    ?? ProjectPlanningProfile.defaultProfile(for: graph)
+                    ?? ProjectPlanningProfile.defaultProfile(for: graph, roleRates: planningRoleRateSeeds)
                 clearMemoryProjects()
                 rememberCurrentProject()
                 try refreshAvailableProjects()
@@ -378,6 +380,30 @@ final class AppState: ObservableObject {
     /// surface's single-organization assumption for this first slice.
     var currentOrganizationID: UUID? {
         roleRates.first?.organizationId ?? teamMembers.first?.organizationId
+    }
+
+    /// Bridges the real organization-wide rates (`roleRates`, keyed by
+    /// `OrganizationRole`) into `ProjectPlanningProfile.defaultProfile`'s seed
+    /// dictionary (keyed by the narrower `PlanningRole`). Empty until
+    /// `loadRoleRates` has actually run, so callers before that (including
+    /// `AppState.init()`, which has no session yet) naturally fall back to
+    /// the placeholder rates baked into `defaultProfile`. `.operations` has
+    /// no `OrganizationRole` counterpart and always falls back.
+    private var planningRoleRateSeeds: [PlanningRole: Int] {
+        let mapping: [PlanningRole: OrganizationRole] = [
+            .product: .product,
+            .technicalLead: .technicalLead,
+            .design: .design,
+            .development: .development,
+            .quality: .qa,
+        ]
+        var seeds: [PlanningRole: Int] = [:]
+        for (planningRole, organizationRole) in mapping {
+            if let match = roleRates.first(where: { $0.role == organizationRole }) {
+                seeds[planningRole] = match.hourlyRateMXN
+            }
+        }
+        return seeds
     }
 
     func loadRoleRates(using authentication: AuthenticationController) async {
@@ -589,7 +615,7 @@ final class AppState: ObservableObject {
             template: template,
             webTechnologies: webTechnologies
         )
-        let profile = ProjectPlanningProfile.defaultProfile(for: project)
+        let profile = ProjectPlanningProfile.defaultProfile(for: project, roleRates: planningRoleRateSeeds)
 
         do {
             try ProjectGraphValidator.validate(project)
@@ -637,10 +663,10 @@ final class AppState: ObservableObject {
             let loadedProfile: ProjectPlanningProfile
             if let store {
                 loadedProfile = try store.loadPlanningProfile(projectID: projectID)
-                    ?? ProjectPlanningProfile.defaultProfile(for: loaded)
+                    ?? ProjectPlanningProfile.defaultProfile(for: loaded, roleRates: planningRoleRateSeeds)
             } else {
                 loadedProfile = memoryPlanningProfiles[projectID]
-                    ?? ProjectPlanningProfile.defaultProfile(for: loaded)
+                    ?? ProjectPlanningProfile.defaultProfile(for: loaded, roleRates: planningRoleRateSeeds)
             }
             graph = loaded
             planningProfile = loadedProfile
@@ -1211,7 +1237,7 @@ final class AppState: ObservableObject {
     private func replaceWorkspaceWithPlaceholder(state: WorkspaceContentState) {
         let placeholder = ProjectGraph(name: "Sin proyecto activo")
         graph = placeholder
-        planningProfile = ProjectPlanningProfile.defaultProfile(for: placeholder)
+        planningProfile = ProjectPlanningProfile.defaultProfile(for: placeholder, roleRates: planningRoleRateSeeds)
         selectedProjectTemplate = .blankCanvas
         clearMemoryProjects()
         availableProjects = []
